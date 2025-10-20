@@ -11,7 +11,7 @@ const API_CONFIG = {
   // 后端API地址
   baseURL: isLocalhost 
     ? 'http://localhost:5001'  // 本地开发（5000端口被系统占用，改用5001）
-    : 'https://your-backend.onrender.com',  // 生产环境（需要替换为实际的Render地址）
+    : 'https://zhiji.onrender.com',  // 生产环境
   
   // 超时设置
   timeout: 30000,

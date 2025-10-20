@@ -2204,13 +2204,11 @@
         });
       }
       
-      // 如果没有匹配到食物，提供一个默认值
+      // 如果没有匹配到食物，说明AI分析失败
       if (calories === 0) {
-        console.warn('⚠️ 未获取到AI分析结果，使用默认值');
-        calories = 300;
-        protein = 20;
-        carbs = 40;
-        fat = 15;
+        console.error('❌ AI分析失败，未获取到有效结果');
+        console.error('❌ 请检查AI API是否正确调用');
+        throw new Error('AI分析失败，请检查网络连接和API配置');
       }
       
       // 生成AI建议

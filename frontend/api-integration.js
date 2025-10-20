@@ -48,7 +48,7 @@ async function checkBackendHealth() {
       console.warn('[Health] Redis未连接,使用内存模式');
     }
     if (!health.services.openai) {
-      console.warn('[Health] OpenAI未配置,使用降级分析');
+      console.error('[Health] OpenAI未配置,AI分析功能不可用');
     }
     if (!health.services.garmin) {
       console.warn('[Health] Garmin未配置,使用模拟数据');

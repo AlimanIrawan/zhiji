@@ -88,40 +88,53 @@ class APIClient {
   }
 
   /**
-   * 保存饮食记录
+   * 保存饮食记录 - 保存到 Vercel Redis
    */
   async saveRecord(record) {
-    return await this.request(window.API_ENDPOINTS.saveRecord, {
-      method: 'POST',
-      body: JSON.stringify({
-        user_id: this.userId,
-        ...record
-      })
-    });
+    try {
+      const response = await fetch('/api/redis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(record)
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('保存记录失败:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**
-   * 获取饮食记录
+   * 获取饮食记录 - 从 Vercel Redis 获取
    */
   async getRecords(date) {
-    const params = new URLSearchParams({
-      user_id: this.userId,
-      date: date
-    });
-    return await this.request(`${window.API_ENDPOINTS.getRecords}?${params}`);
+    try {
+      const response = await fetch('/api/redis');
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('获取记录失败:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**
-   * 删除饮食记录
+   * 删除饮食记录 - 从 Vercel Redis 删除
    */
   async deleteRecord(recordId, date) {
-    const params = new URLSearchParams({
-      user_id: this.userId,
-      date: date
-    });
-    return await this.request(`${window.API_ENDPOINTS.deleteRecord(recordId)}?${params}`, {
-      method: 'DELETE'
-    });
+    try {
+      const response = await fetch(`/api/redis?id=${recordId}`, {
+        method: 'DELETE'
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('删除记录失败:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   /**

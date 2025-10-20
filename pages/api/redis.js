@@ -13,7 +13,7 @@ function getRedisClient() {
   });
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   console.log('=== Redis API 被调用 ===');
   console.log('请求方法:', req.method);
   console.log('请求URL:', req.url);

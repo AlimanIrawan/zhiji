@@ -1,6 +1,9 @@
 {
   "name": "zhiji-frontend",
   "version": "1.0.0",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "@upstash/redis": "^1.25.0"
   }

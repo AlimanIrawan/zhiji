@@ -15,9 +15,10 @@ class RedisService:
     
     def __init__(self):
         """初始化Redis连接"""
-        redis_url = os.getenv('REDIS_URL')
+        # 优先使用 REDIS_REDIS_URL（Vercel生成），其次使用 REDIS_URL
+        redis_url = os.getenv('REDIS_REDIS_URL') or os.getenv('REDIS_URL')
         if not redis_url:
-            logger.warning("未配置REDIS_URL，使用内存模式（数据不会持久化）")
+            logger.warning("未配置Redis URL，使用内存模式（数据不会持久化）")
             self.client = None
             self.memory_store = {}  # 内存存储，用于开发测试
         else:

@@ -1521,7 +1521,7 @@
       
       // 保存记录按钮点击
       const saveRecordBtn = document.getElementById('save-record');
-      saveRecordBtn.addEventListener('click', function() {
+      saveRecordBtn.addEventListener('click', async function() {
         console.log('💾 开始保存记录...');
         
         if (!appData.currentRecord) {
@@ -1630,19 +1630,29 @@
       });
       
       // 删除记录按钮点击
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', async function(e) {
         if (e.target.closest('.delete-record')) {
           const recordId = e.target.closest('.delete-record').getAttribute('data-id');
           
           if (confirm('确定要删除这条记录吗？')) {
-            // 删除记录
-            appData.foodRecords = appData.foodRecords.filter(record => record.id !== recordId);
-            
-            // 更新每日汇总
-            updateDailySummary();
-            
-            // 更新UI
-            updateUI();
+            try {
+              // 调用后端API删除记录
+              console.log('🗑️ 开始删除记录:', recordId);
+              const response = await window.apiClient.deleteRecord(recordId);
+              console.log('✅ 后端删除成功:', response);
+              
+              // 从本地数组删除
+              appData.foodRecords = appData.foodRecords.filter(record => record.id !== recordId);
+              
+              // 更新UI
+              updateCalorieRecords();
+              loadHistoryRecords();
+              updateDailySummary();
+              
+            } catch (error) {
+              console.error('❌ 删除记录失败:', error);
+              alert('删除失败: ' + error.message);
+            }
           }
         }
       });
@@ -1834,8 +1844,20 @@
         }
         
         itemHTML += `
-          <p class="text-xs text-center truncate w-full">${record.description}</p>
-          <p class="text-xs text-gray-500 mt-1">${record.calories} kcal</p>
+          <div class="flex items-center justify-between w-full">
+            <div class="flex-1">
+              <p class="text-xs text-center truncate">${record.description}</p>
+              <p class="text-xs text-gray-500 mt-1">${record.calories} kcal</p>
+            </div>
+            <div class="flex items-center space-x-1 ml-2">
+              <button class="text-primary hover:text-blue-700 add-record-btn" data-id="${record.id}" title="添加到表单">
+                <i class="fa fa-plus-circle text-sm"></i>
+              </button>
+              <button class="text-gray-400 hover:text-red-500 delete-record" data-id="${record.id}" title="删除记录">
+                <i class="fa fa-trash-o text-sm"></i>
+              </button>
+            </div>
+          </div>
         `;
         
         historyItem.innerHTML = itemHTML;

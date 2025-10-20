@@ -1,11 +1,10 @@
 {
   "version": 2,
-  "functions": {
-    "api/redis.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "builds": [
+    {
+      "src": "pages/api/**/*.js",
+      "use": "@vercel/node"
+    },
     {
       "src": "**/*",
       "use": "@vercel/static"

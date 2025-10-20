@@ -14,14 +14,26 @@ function getRedisClient() {
 }
 
 export default async function handler(req, res) {
+  console.log('=== Redis API 被调用 ===');
+  console.log('请求方法:', req.method);
+  console.log('请求URL:', req.url);
+  console.log('请求头:', req.headers);
+  console.log('环境变量检查:');
+  console.log('REDIS_REDIS_URL 存在:', !!process.env.REDIS_REDIS_URL);
+  console.log('REDIS_KV_REST_API_TOKEN 存在:', !!process.env.REDIS_KV_REST_API_TOKEN);
+  
   const { method } = req;
   
   try {
+    console.log('开始创建 Redis 客户端...');
     const redis = getRedisClient();
+    console.log('Redis 客户端创建成功');
     
     if (method === 'GET') {
+      console.log('处理 GET 请求...');
       // 获取所有饮食记录
       const records = await redis.get('food_records') || [];
+      console.log('获取到的记录数量:', records.length);
       
       return res.status(200).json({
         success: true,
@@ -79,7 +91,10 @@ export default async function handler(req, res) {
     }
     
   } catch (error) {
-    console.error('Redis API 错误:', error);
+    console.error('=== Redis API 错误 ===');
+    console.error('错误类型:', error.constructor.name);
+    console.error('错误消息:', error.message);
+    console.error('错误堆栈:', error.stack);
     return res.status(500).json({
       success: false,
       error: error.message

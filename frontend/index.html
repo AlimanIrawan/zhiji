@@ -913,13 +913,27 @@
     }
 
     // 初始化应用
-    function initializeApp() {
+    async function initializeApp() {
       // 设置当前日期
       const today = new Date().toISOString().split('T')[0];
-      document.getElementById('record-date').value = today;
+      const recordDateEl = document.getElementById('record-date');
+      if (recordDateEl) {
+        recordDateEl.value = today;
+      }
       
-      // 检查本地存储
-      checkLocalStorage();
+      // 从后端加载数据
+      console.log('🚀 初始化应用，从后端加载数据...');
+      try {
+        const response = await window.apiClient.getRecords();
+        if (response.success && response.data) {
+          appData.foodRecords = response.data;
+          console.log('✅ 初始化数据加载成功，记录数量:', appData.foodRecords.length);
+        }
+      } catch (error) {
+        console.error('❌ 初始化数据加载失败:', error);
+        // 如果后端加载失败，使用空数组
+        appData.foodRecords = [];
+      }
       
       // 更新UI
       updateUI();
@@ -1549,10 +1563,22 @@
         
         console.log('📋 记录对象:', record);
         
-        // 4. 保存到数据数组
-        appData.foodRecords.unshift(record);
-        console.log('✅ 记录已添加到数据数组');
-        console.log('📊 当前记录总数:', appData.foodRecords.length);
+        // 4. 保存到后端数据库
+        console.log('🌐 开始保存到后端数据库...');
+        try {
+          const response = await window.apiClient.saveRecord(record);
+          console.log('✅ 后端保存成功:', response);
+          
+          // 保存成功后添加到本地数组
+          appData.foodRecords.unshift(record);
+          console.log('✅ 记录已添加到本地数据数组');
+          console.log('📊 当前记录总数:', appData.foodRecords.length);
+          
+        } catch (error) {
+          console.error('❌ 后端保存失败:', error);
+          alert('保存失败: ' + error.message);
+          return;
+        }
         
         // 5. 更新UI
         updateCalorieRecords();
@@ -1729,10 +1755,27 @@
     }
     
     // 加载历史记录到快捷选择
-    function loadHistoryRecords() {
+    async function loadHistoryRecords() {
       const historyContainer = document.getElementById('history-records');
       
       console.log('🔍 [History] 开始加载历史记录...');
+      
+      // 从后端加载数据
+      try {
+        console.log('🌐 从后端加载历史记录...');
+        const response = await window.apiClient.getRecords();
+        console.log('✅ 后端数据加载成功:', response);
+        
+        if (response.success && response.data) {
+          appData.foodRecords = response.data;
+          console.log('📊 更新本地数据，记录数量:', appData.foodRecords.length);
+        }
+      } catch (error) {
+        console.error('❌ 后端数据加载失败:', error);
+        // 如果后端加载失败，使用本地数据
+        console.log('⚠️ 使用本地数据作为备选');
+      }
+      
       console.log('🔍 [History] appData.foodRecords:', appData.foodRecords);
       console.log('🔍 [History] 记录数量:', appData.foodRecords ? appData.foodRecords.length : 0);
       

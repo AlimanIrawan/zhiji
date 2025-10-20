@@ -9,7 +9,7 @@ function getRedisClient() {
   
   return new Redis({
     url: process.env.REDIS_REDIS_URL,
-    token: process.env.REDIS_REST_API_TOKEN,
+    token: process.env.REDIS_KV_REST_API_TOKEN,
   });
 }
 

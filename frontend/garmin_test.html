@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garmin Connect 数据测试</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- API配置 -->
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 头部 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    <i class="fa fa-heartbeat text-red-500 mr-2"></i>
+                    Garmin Connect 数据测试
+                </h1>
+                <button id="test-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors">
+                    <i class="fa fa-play mr-2"></i>
+                    开始测试
+                </button>
+            </div>
+            <p class="text-gray-600 mt-2">测试Garmin Connect连接并查看可用的数据类型</p>
+        </div>
+
+        <!-- 状态显示 -->
+        <div id="status-card" class="bg-white rounded-xl shadow-md p-6 mb-6 hidden">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">连接状态</h2>
+            <div id="status-content" class="space-y-3">
+                <!-- 状态内容将在这里动态生成 -->
+            </div>
+        </div>
+
+        <!-- 测试结果 -->
+        <div id="results-card" class="bg-white rounded-xl shadow-md p-6 mb-6 hidden">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">测试结果</h2>
+            <div id="results-content" class="space-y-4">
+                <!-- 测试结果将在这里动态生成 -->
+            </div>
+        </div>
+
+        <!-- 原始数据 -->
+        <div id="raw-data-card" class="bg-white rounded-xl shadow-md p-6 hidden">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">原始数据</h2>
+            <div class="bg-gray-100 rounded-lg p-4">
+                <pre id="raw-data" class="text-sm text-gray-700 whitespace-pre-wrap overflow-auto max-h-96"></pre>
+            </div>
+        </div>
+
+        <!-- 返回按钮 -->
+        <div class="text-center">
+            <a href="index.html" class="inline-flex items-center text-blue-500 hover:text-blue-600 transition-colors">
+                <i class="fa fa-arrow-left mr-2"></i>
+                返回主应用
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // 初始化API客户端
+        const apiClient = new APIClient();
+        
+        // 测试按钮点击事件
+        document.getElementById('test-btn').addEventListener('click', async function() {
+            await runGarminTest();
+        });
+
+        async function runGarminTest() {
+            const testBtn = document.getElementById('test-btn');
+            const statusCard = document.getElementById('status-card');
+            const resultsCard = document.getElementById('results-card');
+            const rawDataCard = document.getElementById('raw-data-card');
+            
+            // 显示加载状态
+            testBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i>测试中...';
+            testBtn.disabled = true;
+            
+            try {
+                console.log('🔍 开始Garmin连接测试...');
+                
+                // 调用测试API
+                const response = await fetch(`${apiClient.baseURL}/api/garmin/test`);
+                const data = await response.json();
+                
+                console.log('🔍 Garmin测试结果:', data);
+                
+                // 显示状态
+                displayStatus(data);
+                statusCard.classList.remove('hidden');
+                
+                if (data.success) {
+                    // 显示测试结果
+                    displayResults(data.test_data);
+                    resultsCard.classList.remove('hidden');
+                    
+                    // 显示原始数据
+                    displayRawData(data);
+                    rawDataCard.classList.remove('hidden');
+                }
+                
+            } catch (error) {
+                console.error('❌ Garmin测试失败:', error);
+                displayError(error);
+                statusCard.classList.remove('hidden');
+            } finally {
+                // 恢复按钮状态
+                testBtn.innerHTML = '<i class="fa fa-play mr-2"></i>开始测试';
+                testBtn.disabled = false;
+            }
+        }
+
+        function displayStatus(data) {
+            const statusContent = document.getElementById('status-content');
+            
+            let statusHtml = '';
+            
+            // 配置状态
+            statusHtml += `
+                <div class="flex items-center justify-between p-3 rounded-lg ${data.configured ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+                    <div class="flex items-center">
+                        <i class="fa fa-cog mr-2 ${data.configured ? 'text-green-500' : 'text-red-500'}"></i>
+                        <span class="font-medium">账号配置</span>
+                    </div>
+                    <span class="px-2 py-1 rounded text-sm ${data.configured ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                        ${data.configured ? '已配置' : '未配置'}
+                    </span>
+                </div>
+            `;
+            
+            // 登录状态
+            if (data.configured) {
+                statusHtml += `
+                    <div class="flex items-center justify-between p-3 rounded-lg ${data.login_success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+                        <div class="flex items-center">
+                            <i class="fa fa-sign-in mr-2 ${data.login_success ? 'text-green-500' : 'text-red-500'}"></i>
+                            <span class="font-medium">登录状态</span>
+                        </div>
+                        <span class="px-2 py-1 rounded text-sm ${data.login_success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${data.login_success ? '成功' : '失败'}
+                        </span>
+                    </div>
+                `;
+            }
+            
+            // 错误信息
+            if (data.error) {
+                statusHtml += `
+                    <div class="p-3 rounded-lg bg-red-50 border border-red-200">
+                        <div class="flex items-center mb-2">
+                            <i class="fa fa-exclamation-triangle text-red-500 mr-2"></i>
+                            <span class="font-medium text-red-800">错误信息</span>
+                        </div>
+                        <p class="text-red-700 text-sm">${data.error}</p>
+                    </div>
+                `;
+            }
+            
+            statusContent.innerHTML = statusHtml;
+        }
+
+        function displayResults(testData) {
+            const resultsContent = document.getElementById('results-content');
+            
+            let resultsHtml = '';
+            
+            // 遍历测试数据
+            for (const [key, value] of Object.entries(testData)) {
+                const isError = typeof value === 'string' && value.includes('失败');
+                
+                resultsHtml += `
+                    <div class="border rounded-lg p-4 ${isError ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'}">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-medium text-gray-800">${getDataTypeName(key)}</h3>
+                            <span class="px-2 py-1 rounded text-xs ${isError ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                                ${isError ? '失败' : '成功'}
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-600">
+                            ${isError ? value : formatDataValue(value)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultsContent.innerHTML = resultsHtml;
+        }
+
+        function displayRawData(data) {
+            const rawData = document.getElementById('raw-data');
+            rawData.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function displayError(error) {
+            const statusContent = document.getElementById('status-content');
+            statusContent.innerHTML = `
+                <div class="p-3 rounded-lg bg-red-50 border border-red-200">
+                    <div class="flex items-center mb-2">
+                        <i class="fa fa-exclamation-triangle text-red-500 mr-2"></i>
+                        <span class="font-medium text-red-800">连接失败</span>
+                    </div>
+                    <p class="text-red-700 text-sm">${error.message}</p>
+                </div>
+            `;
+        }
+
+        function getDataTypeName(key) {
+            const names = {
+                'user_info': '用户信息',
+                'today_activities': '今日活动',
+                'recent_activities': '最近活动',
+                'heart_rate': '心率数据',
+                'steps': '步数数据',
+                'calories': '卡路里数据'
+            };
+            return names[key] || key;
+        }
+
+        function formatDataValue(value) {
+            if (Array.isArray(value)) {
+                return `共 ${value.length} 条记录`;
+            } else if (typeof value === 'object' && value !== null) {
+                return `包含 ${Object.keys(value).length} 个字段`;
+            } else {
+                return String(value);
+            }
+        }
+    </script>
+</body>
+</html>

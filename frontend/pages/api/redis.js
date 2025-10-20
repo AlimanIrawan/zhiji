@@ -14,13 +14,17 @@ function getRedisClient() {
 }
 
 module.exports = async function handler(req, res) {
-  console.log('=== Redis API 被调用 ===');
-  console.log('请求方法:', req.method);
-  console.log('请求URL:', req.url);
-  console.log('请求头:', req.headers);
-  console.log('环境变量检查:');
-  console.log('REDIS_REDIS_URL 存在:', !!process.env.REDIS_REDIS_URL);
-  console.log('REDIS_KV_REST_API_TOKEN 存在:', !!process.env.REDIS_KV_REST_API_TOKEN);
+  console.log('🚀 ===== Redis API 开始处理 =====');
+  console.log('📅 时间:', new Date().toISOString());
+  console.log('🌐 请求方法:', req.method);
+  console.log('🔗 请求URL:', req.url);
+  console.log('📋 请求头:', JSON.stringify(req.headers, null, 2));
+  console.log('🔧 环境变量检查:');
+  console.log('  - REDIS_REDIS_URL 存在:', !!process.env.REDIS_REDIS_URL);
+  console.log('  - REDIS_KV_REST_API_TOKEN 存在:', !!process.env.REDIS_KV_REST_API_TOKEN);
+  console.log('  - NODE_ENV:', process.env.NODE_ENV);
+  console.log('  - VERCEL:', process.env.VERCEL);
+  console.log('  - VERCEL_ENV:', process.env.VERCEL_ENV);
   
   const { method } = req;
   
@@ -91,13 +95,22 @@ module.exports = async function handler(req, res) {
     }
     
   } catch (error) {
-    console.error('=== Redis API 错误 ===');
-    console.error('错误类型:', error.constructor.name);
-    console.error('错误消息:', error.message);
-    console.error('错误堆栈:', error.stack);
+    console.error('❌ ===== Redis API 错误 =====');
+    console.error('📅 错误时间:', new Date().toISOString());
+    console.error('🔍 错误类型:', error.constructor.name);
+    console.error('💬 错误消息:', error.message);
+    console.error('📚 错误堆栈:', error.stack);
+    console.error('🔧 环境变量状态:');
+    console.error('  - REDIS_REDIS_URL:', process.env.REDIS_REDIS_URL ? '已设置' : '未设置');
+    console.error('  - REDIS_KV_REST_API_TOKEN:', process.env.REDIS_KV_REST_API_TOKEN ? '已设置' : '未设置');
+    console.error('❌ ===== 错误结束 =====');
+    
     return res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
+  
+  console.log('✅ ===== Redis API 处理完成 =====');
 }

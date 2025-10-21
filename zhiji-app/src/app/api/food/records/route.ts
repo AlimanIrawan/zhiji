@@ -15,15 +15,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const foodService = new FoodService();
-    
     if (date) {
       // 获取特定日期的食物记录
-      const records = await foodService.getFoodRecordsByDate(session.user.id, date);
+      const records = await FoodService.getFoodRecords(session.user.id, date);
       return NextResponse.json({ success: true, data: records });
     } else {
       // 获取最近的食物记录
-      const records = await foodService.getRecentFoodRecords(session.user.id, limit, offset);
+      const records = await FoodService.getRecentFoodRecords(session.user.id, limit);
       return NextResponse.json({ success: true, data: records });
     }
 
@@ -54,8 +52,7 @@ export async function POST(request: NextRequest) {
     foodRecord.userId = session.user.id;
     foodRecord.timestamp = new Date().toISOString();
 
-    const foodService = new FoodService();
-    await foodService.saveFoodRecord(foodRecord);
+    await FoodService.saveFoodRecord(foodRecord);
 
     return NextResponse.json({ success: true, data: foodRecord });
 

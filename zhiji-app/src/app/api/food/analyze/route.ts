@@ -91,30 +91,26 @@ export async function POST(request: NextRequest) {
     }
 
     // 创建食物记录
+    const now = new Date();
     const foodRecord = {
-      id: uuidv4(),
       userId: session.user.id,
-      foodName: nutritionData.foodName,
-      portion: nutritionData.portion,
+      recordDate: now.toISOString().split('T')[0], // YYYY-MM-DD
+      recordTime: now.toTimeString().slice(0, 5), // HH:mm
+      description: description || nutritionData.foodName || '未知食物',
       nutrition: nutritionData.nutrition,
-      healthScore: nutritionData.healthScore,
-      tags: nutritionData.tags || [],
-      suggestions: nutritionData.suggestions,
-      image: image || null,
-      description: description || null,
-      timestamp: new Date().toISOString(),
-      mealType: 'other', // 默认值，前端可以修改
+      aiAdvice: nutritionData.suggestions || '',
+      imageUrl: image || undefined,
+      mealType: 'snack' as const, // 默认值，前端可以修改
     };
 
     // 保存到数据库
-    const foodService = new FoodService();
-    await foodService.saveFoodRecord(foodRecord);
+    const recordId = await FoodService.saveFoodRecord(foodRecord);
 
     return NextResponse.json({
       success: true,
       data: {
         analysis: nutritionData,
-        recordId: foodRecord.id,
+        recordId: recordId,
       },
     });
 

@@ -12,55 +12,56 @@ export interface UserProfile {
   updatedAt: string;
 }
 
-// 饮食记录类型定义
-export interface FoodRecord {
-  id: string;
-  recordDate: string;
-  recordTime: string;
-  description: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  aiAdvice: string;
-  imageUrl?: string;
-  createdAt: string;
-}
+// 饮食记录类型定义 (已废弃，使用下面的新定义)
+// export interface FoodRecord {
+//   id: string;
+//   recordDate: string;
+//   recordTime: string;
+//   description: string;
+//   calories: number;
+//   protein: number;
+//   carbs: number;
+//   fat: number;
+//   aiAdvice: string;
+//   imageUrl?: string;
+//   createdAt: string;
+// }
 
-// Garmin数据类型定义
-export interface GarminData {
-  syncDate: string;
-  totalCalories: number;
-  activeCalories: number;
-  steps: number;
-  heartRate: {
-    resting: number;
-    max: number;
-    average: number;
-  };
-  activities: Array<{
-    name: string;
-    type: string;
-    duration: number;
-    calories: number;
-  }>;
-  trainingType: 'none' | 'A' | 'S' | 'both';
-  syncedAt: string;
-}
+// Garmin数据类型定义 (已废弃，使用下面的新定义)
+// export interface GarminData {
+//   syncDate: string;
+//   totalCalories: number;
+//   activeCalories: number;
+//   steps: number;
+//   heartRate: {
+//     resting: number;
+//     max: number;
+//     average: number;
+//   };
+//   activities: Array<{
+//     name: string;
+//     type: string;
+//     duration: number;
+//     calories: number;
+//   }>;
+//   trainingType: 'none' | 'A' | 'S' | 'both';
+//   syncedAt: string;
+// }
 
 // 每日汇总类型定义
-export interface DailySummary {
-  summaryDate: string;
-  totalCaloriesIn: number;
-  totalCaloriesOut: number;
-  totalProtein: number;
-  totalCarbs: number;
-  totalFat: number;
-  trainingType: string;
-  weightChange: number;
-  createdAt: string;
-  updatedAt: string;
-}
+// 旧的DailySummary定义 (已废弃，使用下面的新定义)
+// export interface DailySummary {
+//   summaryDate: string;
+//   totalCaloriesIn: number;
+//   totalCaloriesOut: number;
+//   totalProtein: number;
+//   totalCarbs: number;
+//   totalFat: number;
+//   trainingType: string;
+//   weightChange: number;
+//   createdAt: string;
+//   updatedAt: string;
+// }
 
 // API响应类型定义
 export interface ApiResponse<T = any> {
@@ -98,12 +99,12 @@ export interface GarminSyncResponse {
 
 // NextAuth 类型扩展
 declare module 'next-auth' {
-  interface Session extends DefaultSession {
+  interface Session {
     user: {
       id: string;
       email: string;
       name: string;
-    } & DefaultSession['user'];
+    };
   }
 
   interface User {
@@ -188,11 +189,7 @@ export interface GarminState {
   lastSyncTime: string | null;
 }
 
-// 工具类型
-export type DateString = string; // YYYY-MM-DD format
-export type TimeString = string; // HH:mm format
-export type ActivityLevel = 'low' | 'moderate' | 'high';
-export type TrainingType = 'none' | 'A' | 'S' | 'both';
+
 
 // 新增类型定义
 export interface AuthCredentials {
@@ -449,7 +446,7 @@ export interface UserProfileForm {
   age: number;
   gender: 'male' | 'female' | 'other';
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
-  goals: Partial<UserGoals>;
+  goals?: any;
 }
 
 // 应用状态类型

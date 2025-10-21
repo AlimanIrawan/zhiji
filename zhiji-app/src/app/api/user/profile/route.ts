@@ -10,8 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '未授权访问' }, { status: 401 });
     }
 
-    const userService = new UserService();
-    const profile = await userService.getUserProfile(session.user.id);
+    const profile = await UserService.getProfile(session.user.id);
 
     if (!profile) {
       return NextResponse.json({ error: '用户资料不存在' }, { status: 404 });
@@ -36,10 +35,9 @@ export async function PUT(request: NextRequest) {
     }
 
     const updates = await request.json();
-    const userService = new UserService();
 
     // 获取现有资料
-    const existingProfile = await userService.getUserProfile(session.user.id);
+    const existingProfile = await UserService.getProfile(session.user.id);
     if (!existingProfile) {
       return NextResponse.json({ error: '用户资料不存在' }, { status: 404 });
     }
@@ -52,7 +50,7 @@ export async function PUT(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    await userService.updateUserProfile(session.user.id, updatedProfile);
+    await UserService.updateProfile(session.user.id, updates);
 
     return NextResponse.json({ success: true, data: updatedProfile });
 

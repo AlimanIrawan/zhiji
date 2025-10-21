@@ -26,38 +26,12 @@ export class UserService {
         id: profile.id as string,
         email: profile.email as string,
         name: profile.name as string,
-        avatar: profile.avatar as string,
+
         height: Number(profile.height) || 170,
         currentWeight: Number(profile.currentWeight) || 70,
         targetWeight: Number(profile.targetWeight) || 65,
-        age: Number(profile.age),
-        gender: profile.gender as 'male' | 'female' | 'other',
-        activityLevel: profile.activityLevel as any || 'moderate',
-        goals: profile.goals ? JSON.parse(profile.goals as string) : {
-          dailyCalories: 2000,
-          dailyProtein: 120,
-          dailyCarbs: 250,
-          dailyFat: 67,
-          dailySteps: 10000,
-          weeklyWeightLoss: 0.5
-        },
-        preferences: profile.preferences ? JSON.parse(profile.preferences as string) : {
-          units: 'metric',
-          language: 'zh',
-          timezone: 'Asia/Shanghai',
-          notifications: {
-            mealReminders: true,
-            workoutReminders: true,
-            progressUpdates: true
-          },
-          privacy: {
-            shareProgress: false,
-            allowAnalytics: true
-          }
-        },
-        garminConnected: Boolean(profile.garminConnected),
-        garminUserId: profile.garminUserId as string,
-        garminAccessToken: profile.garminAccessToken as string,
+        dailyCalorieGoal: Number(profile.dailyCalorieGoal) || 2000,
+        activityLevel: (profile.activityLevel as 'low' | 'moderate' | 'high') || 'moderate',
         createdAt: profile.createdAt as string,
         updatedAt: profile.updatedAt as string,
       };
@@ -76,13 +50,7 @@ export class UserService {
         updatedAt: new Date().toISOString(),
       };
 
-      // 序列化复杂对象
-      if (updates.goals) {
-        updateData.goals = JSON.stringify(updates.goals);
-      }
-      if (updates.preferences) {
-        updateData.preferences = JSON.stringify(updates.preferences);
-      }
+
 
       await storage.hset(profileKey, updateData);
       return true;
@@ -199,6 +167,32 @@ export class FoodService {
     }
   }
 
+  // 获取单个食物记录
+  static async getFoodRecord(userId: string, recordId: string): Promise<FoodRecord | null> {
+    try {
+      // 简化实现：遍历最近几天查找记录
+      const today = new Date();
+      
+      for (let i = 0; i < 30; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        
+        const recordKey = `user:${userId}:foods:${dateStr}`;
+        const records = await storage.hgetall(recordKey);
+        
+        if (records && records[recordId]) {
+          return JSON.parse(records[recordId] as string) as FoodRecord;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting food record:', error);
+      return null;
+    }
+  }
+
   // 更新食物记录
   static async updateFoodRecord(userId: string, recordId: string, updates: Partial<FoodRecord>): Promise<boolean> {
     try {
@@ -281,9 +275,9 @@ export class FoodService {
         summary.protein += record.nutrition.protein || 0;
         summary.carbs += record.nutrition.carbs || 0;
         summary.fat += record.nutrition.fat || 0;
-        summary.fiber += record.nutrition.fiber || 0;
-        summary.sugar += record.nutrition.sugar || 0;
-        summary.sodium += record.nutrition.sodium || 0;
+        if (summary.fiber !== undefined) summary.fiber += record.nutrition.fiber || 0;
+        if (summary.sugar !== undefined) summary.sugar += record.nutrition.sugar || 0;
+        if (summary.sodium !== undefined) summary.sodium += record.nutrition.sodium || 0;
       });
 
       return summary;

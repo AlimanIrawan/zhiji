@@ -17,8 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '请提供日期参数' }, { status: 400 });
     }
 
-    const foodService = new FoodService();
-    const dailyNutrition = await foodService.getDailyNutrition(session.user.id, date);
+    const dailyNutrition = await FoodService.calculateDailyNutrition(session.user.id, date);
 
     return NextResponse.json({ success: true, data: dailyNutrition });
 

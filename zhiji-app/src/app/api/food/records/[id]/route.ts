@@ -5,16 +5,16 @@ import { FoodService } from '@/lib/kv';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: '未授权访问' }, { status: 401 });
     }
 
-    const foodService = new FoodService();
-    const record = await foodService.getFoodRecord(params.id);
+    const record = await FoodService.getFoodRecord(session.user.id, id);
 
     if (!record) {
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
@@ -38,8 +38,9 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -47,10 +48,9 @@ export async function PUT(
     }
 
     const updates = await request.json();
-    const foodService = new FoodService();
 
     // 先获取现有记录
-    const existingRecord = await foodService.getFoodRecord(params.id);
+    const existingRecord = await FoodService.getFoodRecord(session.user.id, id);
     if (!existingRecord) {
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
     }
@@ -64,12 +64,12 @@ export async function PUT(
     const updatedRecord = {
       ...existingRecord,
       ...updates,
-      id: params.id, // 确保ID不被修改
+      id: id, // 确保ID不被修改
       userId: session.user.id, // 确保用户ID不被修改
       updatedAt: new Date().toISOString(),
     };
 
-    await foodService.updateFoodRecord(params.id, updatedRecord);
+    await FoodService.updateFoodRecord(session.user.id, id, updatedRecord);
 
     return NextResponse.json({ success: true, data: updatedRecord });
 
@@ -84,18 +84,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: '未授权访问' }, { status: 401 });
     }
 
-    const foodService = new FoodService();
-
     // 先获取现有记录以验证权限
-    const existingRecord = await foodService.getFoodRecord(params.id);
+    const existingRecord = await FoodService.getFoodRecord(session.user.id, id);
     if (!existingRecord) {
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
     }
@@ -105,7 +104,7 @@ export async function DELETE(
       return NextResponse.json({ error: '无权删除此记录' }, { status: 403 });
     }
 
-    await foodService.deleteFoodRecord(params.id);
+    await FoodService.deleteFoodRecord(session.user.id, id);
 
     return NextResponse.json({ success: true, message: '记录已删除' });
 

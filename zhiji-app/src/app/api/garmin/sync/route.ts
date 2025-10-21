@@ -19,13 +19,14 @@ export async function POST(request: NextRequest) {
 
     // 处理Garmin数据格式
     const processedData = {
-      id: uuidv4(),
       userId: session.user.id,
-      date: garminData.date || new Date().toISOString().split('T')[0],
+      syncDate: garminData.date || new Date().toISOString().split('T')[0],
+      totalCalories: garminData.calories || 0,
+      activeCalories: garminData.activeCalories || 0,
+      restingCalories: (garminData.calories || 0) - (garminData.activeCalories || 0),
       steps: garminData.steps || 0,
       distance: garminData.distance || 0,
-      calories: garminData.calories || 0,
-      activeMinutes: garminData.activeMinutes || 0,
+      floorsClimbed: garminData.floorsClimbed || 0,
       heartRate: garminData.heartRate || {
         resting: 0,
         average: 0,
@@ -39,25 +40,10 @@ export async function POST(request: NextRequest) {
         },
       },
       activities: garminData.activities || [],
-      sleep: garminData.sleep || {
-        totalSleep: 0,
-        deepSleep: 0,
-        lightSleep: 0,
-        remSleep: 0,
-        awake: 0,
-        sleepScore: 0,
-      },
-      stress: garminData.stress || {
-        average: 0,
-        max: 0,
-        restPeriods: 0,
-        stressPeriods: 0,
-      },
-      timestamp: new Date().toISOString(),
+      trainingType: garminData.trainingType || 'none',
     };
 
-    const garminService = new GarminService();
-    await garminService.saveGarminData(processedData);
+    await GarminService.saveGarminData(processedData);
 
     return NextResponse.json({
       success: true,
@@ -85,15 +71,13 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date');
     const limit = parseInt(searchParams.get('limit') || '7');
 
-    const garminService = new GarminService();
-    
     if (date) {
       // 获取特定日期的数据
-      const data = await garminService.getGarminDataByDate(session.user.id, date);
+      const data = await GarminService.getGarminData(session.user.id, date);
       return NextResponse.json({ success: true, data });
     } else {
       // 获取最近的数据
-      const data = await garminService.getRecentGarminData(session.user.id, limit);
+      const data = await GarminService.getRecentGarminData(session.user.id, limit);
       return NextResponse.json({ success: true, data });
     }
 

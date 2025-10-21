@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     log.externalService('OpenAI', 'API call initiated', {
       requestId,
-      model: 'gpt-5',
+      model: 'gpt-4o',
       messageCount: messages.length,
       hasImage: !!image
     });
@@ -115,9 +115,9 @@ export async function POST(request: NextRequest) {
     // 调用 OpenAI API
     const openaiStartTime = performance.now();
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: 'gpt-4o',
       messages: messages,
-      max_completion_tokens: 1000,
+      max_tokens: 1000,
     });
 
     const openaiResponseTime = performance.now() - openaiStartTime;

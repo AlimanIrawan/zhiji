@@ -97,28 +97,7 @@ export interface GarminSyncResponse {
   }>;
 }
 
-// NextAuth 类型扩展
-declare module 'next-auth' {
-  interface Session {
-    user: {
-      id: string;
-      email: string;
-      name: string;
-    };
-  }
-
-  interface User {
-    id: string;
-    email: string;
-    name: string;
-  }
-}
-
-declare module 'next-auth/jwt' {
-  interface JWT {
-    id: string;
-  }
-}
+// 移除NextAuth类型扩展，因为不再使用认证系统
 
 // 组件Props类型
 export interface DashboardCardProps {

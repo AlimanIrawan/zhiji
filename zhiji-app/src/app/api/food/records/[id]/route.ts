@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { FoodService } from '@/lib/kv';
 
 export async function GET(
@@ -9,19 +7,17 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
-    const record = await FoodService.getFoodRecord(session.user.id, id);
+    const record = await FoodService.getFoodRecord(userId, id);
 
     if (!record) {
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
     }
 
     // 检查记录是否属于当前用户
-    if (record.userId !== session.user.id) {
+    if (record.userId !== userId) {
       return NextResponse.json({ error: '无权访问此记录' }, { status: 403 });
     }
 
@@ -42,21 +38,19 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const updates = await request.json();
 
     // 先获取现有记录
-    const existingRecord = await FoodService.getFoodRecord(session.user.id, id);
+    const existingRecord = await FoodService.getFoodRecord(userId, id);
     if (!existingRecord) {
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
     }
 
     // 检查记录是否属于当前用户
-    if (existingRecord.userId !== session.user.id) {
+    if (existingRecord.userId !== userId) {
       return NextResponse.json({ error: '无权修改此记录' }, { status: 403 });
     }
 
@@ -65,11 +59,11 @@ export async function PUT(
       ...existingRecord,
       ...updates,
       id: id, // 确保ID不被修改
-      userId: session.user.id, // 确保用户ID不被修改
+      userId: userId, // 确保用户ID不被修改
       updatedAt: new Date().toISOString(),
     };
 
-    await FoodService.updateFoodRecord(session.user.id, id, updatedRecord);
+    await FoodService.updateFoodRecord(userId, id, updatedRecord);
 
     return NextResponse.json({ success: true, data: updatedRecord });
 
@@ -88,23 +82,21 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     // 先获取现有记录以验证权限
-    const existingRecord = await FoodService.getFoodRecord(session.user.id, id);
+    const existingRecord = await FoodService.getFoodRecord(userId, id);
     if (!existingRecord) {
       return NextResponse.json({ error: '记录不存在' }, { status: 404 });
     }
 
     // 检查记录是否属于当前用户
-    if (existingRecord.userId !== session.user.id) {
+    if (existingRecord.userId !== userId) {
       return NextResponse.json({ error: '无权删除此记录' }, { status: 403 });
     }
 
-    await FoodService.deleteFoodRecord(session.user.id, id);
+    await FoodService.deleteFoodRecord(userId, id);
 
     return NextResponse.json({ success: true, message: '记录已删除' });
 

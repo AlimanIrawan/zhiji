@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { FoodService } from '@/lib/kv';
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,10 +9,8 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const { image, description } = await request.json();
 
@@ -93,7 +89,7 @@ export async function POST(request: NextRequest) {
     // 创建食物记录
     const now = new Date();
     const foodRecord = {
-      userId: session.user.id,
+      userId: userId,
       recordDate: now.toISOString().split('T')[0], // YYYY-MM-DD
       recordTime: now.toTimeString().slice(0, 5), // HH:mm
       description: description || nutritionData.foodName || '未知食物',

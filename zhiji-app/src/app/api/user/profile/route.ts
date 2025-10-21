@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { UserService } from '@/lib/kv';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
-    const profile = await UserService.getProfile(session.user.id);
+    const profile = await UserService.getProfile(userId);
 
     if (!profile) {
       return NextResponse.json({ error: '用户资料不存在' }, { status: 404 });
@@ -29,15 +25,13 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const updates = await request.json();
 
     // 获取现有资料
-    const existingProfile = await UserService.getProfile(session.user.id);
+    const existingProfile = await UserService.getProfile(userId);
     if (!existingProfile) {
       return NextResponse.json({ error: '用户资料不存在' }, { status: 404 });
     }
@@ -46,11 +40,11 @@ export async function PUT(request: NextRequest) {
     const updatedProfile = {
       ...existingProfile,
       ...updates,
-      id: session.user.id, // 确保ID不被修改
+      id: userId, // 确保ID不被修改
       updatedAt: new Date().toISOString(),
     };
 
-    await UserService.updateProfile(session.user.id, updates);
+    await UserService.updateProfile(userId, updates);
 
     return NextResponse.json({ success: true, data: updatedProfile });
 

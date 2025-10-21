@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { GarminService } from '@/lib/kv';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const { garminData } = await request.json();
     
@@ -19,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     // 处理Garmin数据格式
     const processedData = {
-      userId: session.user.id,
+      userId: userId,
       syncDate: garminData.date || new Date().toISOString().split('T')[0],
       totalCalories: garminData.calories || 0,
       activeCalories: garminData.activeCalories || 0,
@@ -62,10 +58,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
@@ -73,11 +67,11 @@ export async function GET(request: NextRequest) {
 
     if (date) {
       // 获取特定日期的数据
-      const data = await GarminService.getGarminData(session.user.id, date);
+      const data = await GarminService.getGarminData(userId, date);
       return NextResponse.json({ success: true, data });
     } else {
       // 获取最近的数据
-      const data = await GarminService.getRecentGarminData(session.user.id, limit);
+      const data = await GarminService.getRecentGarminData(userId, limit);
       return NextResponse.json({ success: true, data });
     }
 

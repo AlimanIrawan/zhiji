@@ -1,7 +1,5 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { 
   Flame, 
@@ -28,8 +26,6 @@ interface DashboardData {
 }
 
 export default function HomePage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     todayCalories: 0,
     calorieGoal: 2000,
@@ -41,53 +37,63 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (status === 'loading') return;
-    
-    if (!session) {
-      router.push('/login');
-      return;
-    }
-
-    // 模拟加载仪表板数据
-    const loadDashboardData = async () => {
-      try {
-        // 这里应该调用实际的API
-        // const response = await fetch('/api/dashboard');
-        // const data = await response.json();
-        
-        // 模拟数据
-        setDashboardData({
-          todayCalories: 1450,
-          calorieGoal: 2000,
-          todaySteps: 7500,
-          stepGoal: 10000,
-          weeklyProgress: 68,
-          recentMeals: [
-            { id: '1', name: '早餐：燕麦粥', calories: 320, time: '08:30' },
-            { id: '2', name: '午餐：鸡胸肉沙拉', calories: 450, time: '12:30' },
-            { id: '3', name: '下午茶：苹果', calories: 80, time: '15:00' },
-          ],
-        });
-      } catch (error) {
-        console.error('Failed to load dashboard data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadDashboardData();
-  }, [session, status, router]);
+  }, []);
 
-  if (status === 'loading' || isLoading) {
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // 使用模拟数据，因为这是个人应用
+      setDashboardData({
+        todayCalories: 1250,
+        calorieGoal: 2000,
+        todaySteps: 8500,
+        stepGoal: 10000,
+        weeklyProgress: 65,
+        recentMeals: [
+          {
+            id: '1',
+            foodName: '燕麦粥配蓝莓',
+            timestamp: new Date().toISOString(),
+            nutrition: { calories: 320, protein: 12, carbs: 58, fat: 6 }
+          },
+          {
+            id: '2', 
+            foodName: '鸡胸肉沙拉',
+            timestamp: new Date(Date.now() - 3600000).toISOString(),
+            nutrition: { calories: 450, protein: 35, carbs: 15, fat: 18 }
+          },
+          {
+            id: '3',
+            foodName: '苹果',
+            timestamp: new Date(Date.now() - 7200000).toISOString(), 
+            nutrition: { calories: 95, protein: 0.5, carbs: 25, fat: 0.3 }
+          }
+        ],
+      });
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      // 设置默认数据
+      setDashboardData({
+        todayCalories: 0,
+        calorieGoal: 2000,
+        todaySteps: 0,
+        stepGoal: 10000,
+        weeklyProgress: 0,
+        recentMeals: [],
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
-  }
-
-  if (!session) {
-    return null;
   }
 
   const calorieProgress = (dashboardData.todayCalories / dashboardData.calorieGoal) * 100;
@@ -104,7 +110,7 @@ export default function HomePage() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              你好，{session.user?.name}！
+              你好，欢迎使用脂记！
             </h1>
             <p className="text-gray-600 flex items-center">
               <Calendar className="h-4 w-4 mr-2" />

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
 import { 
   Home, 
   Camera, 
@@ -27,11 +26,6 @@ const navigation = [
 export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { data: session } = useSession();
-
-  const handleSignOut = () => {
-    signOut({ callbackUrl: '/login' });
-  };
 
   return (
     <>
@@ -69,21 +63,12 @@ export default function Navigation() {
             </div>
 
             <div className="flex items-center space-x-4">
-              {session?.user && (
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center">
-                    <User className="h-5 w-5 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-700">{session.user.name}</span>
-                  </div>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    退出
-                  </button>
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center">
+                  <User className="h-5 w-5 text-gray-400 mr-2" />
+                  <span className="text-sm text-gray-700">个人应用</span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -136,21 +121,12 @@ export default function Navigation() {
                 );
               })}
               
-              {session?.user && (
-                <div className="border-t border-gray-200 pt-4 mt-4">
-                  <div className="flex items-center px-3 py-2">
-                    <User className="h-5 w-5 text-gray-400 mr-3" />
-                    <span className="text-base text-gray-700">{session.user.name}</span>
-                  </div>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center w-full px-3 py-2 text-base text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
-                  >
-                    <LogOut className="h-5 w-5 mr-3" />
-                    退出
-                  </button>
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="flex items-center px-3 py-2">
+                  <User className="h-5 w-5 text-gray-400 mr-3" />
+                  <span className="text-base text-gray-700">个人应用</span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}

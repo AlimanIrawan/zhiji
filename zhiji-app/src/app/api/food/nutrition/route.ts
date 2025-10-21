@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { FoodService } from '@/lib/kv';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
@@ -17,7 +13,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '请提供日期参数' }, { status: 400 });
     }
 
-    const dailyNutrition = await FoodService.calculateDailyNutrition(session.user.id, date);
+    const dailyNutrition = await FoodService.calculateDailyNutrition(userId, date);
 
     return NextResponse.json({ success: true, data: dailyNutrition });
 

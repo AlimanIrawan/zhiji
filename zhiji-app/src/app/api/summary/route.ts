@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { SummaryService } from '@/lib/kv';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
@@ -16,11 +12,11 @@ export async function GET(request: NextRequest) {
 
     if (date) {
       // 获取特定日期的总结
-      const summary = await SummaryService.getDailySummary(session.user.id, date);
+      const summary = await SummaryService.getDailySummary(userId, date);
       return NextResponse.json({ success: true, data: summary });
     } else {
       // 获取最近的总结
-      const summaries = await SummaryService.getRecentSummaries(session.user.id, limit);
+      const summaries = await SummaryService.getRecentSummaries(userId, limit);
       return NextResponse.json({ success: true, data: summaries });
     }
 
@@ -35,10 +31,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const { date } = await request.json();
     
@@ -47,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const summary = await SummaryService.saveDailySummary({
-      userId: session.user.id,
+      userId: userId,
       summaryDate: date,
       nutrition: {
         totalCaloriesIn: 0,

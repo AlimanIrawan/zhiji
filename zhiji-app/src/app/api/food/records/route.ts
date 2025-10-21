@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { FoodService } from '@/lib/kv';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
@@ -17,11 +13,11 @@ export async function GET(request: NextRequest) {
 
     if (date) {
       // 获取特定日期的食物记录
-      const records = await FoodService.getFoodRecords(session.user.id, date);
+      const records = await FoodService.getFoodRecords(userId, date);
       return NextResponse.json({ success: true, data: records });
     } else {
       // 获取最近的食物记录
-      const records = await FoodService.getRecentFoodRecords(session.user.id, limit);
+      const records = await FoodService.getRecentFoodRecords(userId, limit);
       return NextResponse.json({ success: true, data: records });
     }
 
@@ -36,10 +32,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
+    // 使用固定的用户ID，因为这是个人应用
+    const userId = 'personal-user';
 
     const foodRecord = await request.json();
     
@@ -49,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 添加用户ID和时间戳
-    foodRecord.userId = session.user.id;
+    foodRecord.userId = userId;
     foodRecord.timestamp = new Date().toISOString();
 
     await FoodService.saveFoodRecord(foodRecord);

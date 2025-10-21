@@ -118,7 +118,6 @@ export async function POST(request: NextRequest) {
       model: 'gpt-5',
       messages: messages,
       max_completion_tokens: 1000,
-      temperature: 0.3,
     });
 
     const openaiResponseTime = performance.now() - openaiStartTime;

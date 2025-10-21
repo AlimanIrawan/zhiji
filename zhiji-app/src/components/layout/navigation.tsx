@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Home, 
   Camera, 
@@ -26,6 +26,45 @@ const navigation = [
 export default function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  // 添加调试日志
+  useEffect(() => {
+    console.log('[DEBUG] Navigation: 组件已挂载');
+    console.log('[DEBUG] Navigation: 当前路径:', pathname);
+    console.log('[DEBUG] Navigation: 可用路由:', navigation.map(n => n.href));
+  }, []);
+
+  useEffect(() => {
+    console.log('[DEBUG] Navigation: 路径变化:', pathname);
+    
+    // 检查当前路径是否在导航列表中
+    const currentRoute = navigation.find(nav => nav.href === pathname);
+    if (currentRoute) {
+      console.log('[DEBUG] Navigation: 找到匹配路由:', currentRoute.name);
+    } else {
+      console.warn('[DEBUG] Navigation: 未找到匹配路由，当前路径:', pathname);
+    }
+  }, [pathname]);
+
+  // 添加链接点击处理函数
+  const handleLinkClick = (href: string, name: string) => {
+    console.log('[DEBUG] Navigation: 点击链接:', name, '目标:', href);
+    console.log('[DEBUG] Navigation: 当前路径:', pathname);
+    
+    // 检查是否是当前页面
+    if (pathname === href) {
+      console.log('[DEBUG] Navigation: 已在目标页面，无需跳转');
+      return;
+    }
+    
+    try {
+      console.log('[DEBUG] Navigation: 开始路由跳转...');
+      // 这里不需要手动调用router.push，Link组件会处理
+    } catch (error) {
+      console.error('[DEBUG] Navigation: 路由跳转失败:', error);
+    }
+  };
 
   return (
     <>
@@ -49,6 +88,7 @@ export default function Navigation() {
                   <Link
                     key={item.name}
                     href={item.href}
+                    onClick={() => handleLinkClick(item.href, item.name)}
                     className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive
                         ? 'text-primary-600 bg-primary-50'

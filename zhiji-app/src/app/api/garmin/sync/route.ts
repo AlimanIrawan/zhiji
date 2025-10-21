@@ -1,56 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GarminService } from '@/lib/kv';
-import { v4 as uuidv4 } from 'uuid';
+import { garminService } from '@/lib/garmin-service';
 
 export async function POST(request: NextRequest) {
   try {
-    // 使用固定的用户ID，因为这是个人应用
-    const userId = 'personal-user';
-
-    const { garminData } = await request.json();
+    console.log('[DEBUG] API: 开始 Garmin 数据同步...');
     
-    if (!garminData) {
-      return NextResponse.json({ error: '缺少Garmin数据' }, { status: 400 });
+    // 检查是否配置了 Garmin 账号
+    if (!garminService.isConfigured()) {
+      console.error('[ERROR] API: 未配置 Garmin 账号信息');
+      return NextResponse.json({ 
+        error: '未配置 Garmin 账号信息，请在环境变量中设置 GARMIN_EMAIL 和 GARMIN_PASSWORD' 
+      }, { status: 400 });
     }
 
-    // 处理Garmin数据格式
-    const processedData = {
-      userId: userId,
-      syncDate: garminData.date || new Date().toISOString().split('T')[0],
-      totalCalories: garminData.calories || 0,
-      activeCalories: garminData.activeCalories || 0,
-      restingCalories: (garminData.calories || 0) - (garminData.activeCalories || 0),
-      steps: garminData.steps || 0,
-      distance: garminData.distance || 0,
-      floorsClimbed: garminData.floorsClimbed || 0,
-      heartRate: garminData.heartRate || {
-        resting: 0,
-        average: 0,
-        max: 0,
-        zones: {
-          zone1: 0,
-          zone2: 0,
-          zone3: 0,
-          zone4: 0,
-          zone5: 0,
-        },
-      },
-      activities: garminData.activities || [],
-      trainingType: garminData.trainingType || 'none',
-    };
+    // 从请求中获取日期参数（可选）
+    const body = await request.json().catch(() => ({}));
+    const date = body.date;
 
-    await GarminService.saveGarminData(processedData);
+    // 使用 Garmin Connect 服务同步数据
+    const garminData = await garminService.syncData(date);
+    console.log('[DEBUG] API: Garmin 数据同步成功:', garminData);
+
+    // 保存到 KV 存储
+    await GarminService.saveGarminData(garminData);
+    console.log('[DEBUG] API: 数据已保存到 KV 存储');
 
     return NextResponse.json({
       success: true,
-      data: processedData,
+      data: garminData,
       message: 'Garmin数据同步成功',
     });
 
   } catch (error) {
-    console.error('Garmin sync error:', error);
+    console.error('[ERROR] API: Garmin sync error:', error);
+    
+    // 根据错误类型返回不同的错误信息
+    let errorMessage = 'Garmin数据同步失败';
+    if (error instanceof Error) {
+      if (error.message.includes('登录失败')) {
+        errorMessage = 'Garmin 账号登录失败，请检查账号密码是否正确';
+      } else if (error.message.includes('未配置')) {
+        errorMessage = '未配置 Garmin 账号信息';
+      } else {
+        errorMessage = `同步失败: ${error.message}`;
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Garmin数据同步失败' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

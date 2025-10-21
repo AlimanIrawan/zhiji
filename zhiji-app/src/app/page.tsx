@@ -37,14 +37,27 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[DEBUG] HomePage: 组件已挂载，开始加载数据');
     loadDashboardData();
   }, []);
 
   const loadDashboardData = async () => {
     try {
+      console.log('[DEBUG] HomePage: 开始加载仪表板数据');
       setIsLoading(true);
       
+      // 测试数据库连接
+      try {
+        console.log('[DEBUG] HomePage: 测试数据库连接...');
+        const dbTestResponse = await fetch('/api/debug/db-test');
+        const dbTestResult = await dbTestResponse.json();
+        console.log('[DEBUG] HomePage: 数据库测试结果:', dbTestResult);
+      } catch (dbError) {
+        console.error('[DEBUG] HomePage: 数据库连接测试失败:', dbError);
+      }
+      
       // 使用模拟数据，因为这是个人应用
+      console.log('[DEBUG] HomePage: 设置模拟数据');
       setDashboardData({
         todayCalories: 1250,
         calorieGoal: 2000,
@@ -72,8 +85,13 @@ export default function HomePage() {
           }
         ],
       });
+      console.log('[DEBUG] HomePage: 数据加载完成');
     } catch (error) {
-      console.error('Failed to load dashboard data:', error);
+      console.error('[DEBUG] HomePage: 加载仪表板数据失败:', error);
+      console.error('[DEBUG] HomePage: 错误详情:', {
+        message: error instanceof Error ? error.message : '未知错误',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       // 设置默认数据
       setDashboardData({
         todayCalories: 0,
@@ -84,17 +102,21 @@ export default function HomePage() {
         recentMeals: [],
       });
     } finally {
+      console.log('[DEBUG] HomePage: 设置加载状态为false');
       setIsLoading(false);
     }
   };
 
   if (isLoading) {
+    console.log('[DEBUG] HomePage: 显示加载状态');
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
+
+  console.log('[DEBUG] HomePage: 渲染主页面，数据:', dashboardData);
 
   const calorieProgress = (dashboardData.todayCalories / dashboardData.calorieGoal) * 100;
   const stepProgress = (dashboardData.todaySteps / dashboardData.stepGoal) * 100;

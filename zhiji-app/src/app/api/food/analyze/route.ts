@@ -36,7 +36,12 @@ export async function POST(request: NextRequest) {
     let messages: any[] = [
       {
         role: 'system',
-        content: `你是一个专业的营养分析师。请分析用户提供的食物信息，并返回详细的营养分析结果。
+        content: `你是一个专业的营养分析师，具备图像识别能力。你必须分析用户提供的食物信息（包括图片），并严格按照JSON格式返回结果。
+
+重要规则：
+1. 你必须能够分析图片中的食物
+2. 你必须只返回有效的JSON格式，不要添加任何解释文字
+3. 如果图片不清晰，请根据可见部分进行合理估算
 
 请严格按照以下JSON格式返回结果：
 {
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
   "suggestions": "营养建议"
 }
 
-请确保所有数值都是合理的数字，不要包含单位。健康评分范围是1-100。`
+请确保所有数值都是合理的数字，不要包含单位。健康评分范围是1-100。只返回JSON，不要添加任何其他文字。`
       }
     ];
 
@@ -118,6 +123,8 @@ export async function POST(request: NextRequest) {
       model: 'gpt-4o',
       messages: messages,
       max_tokens: 1000,
+      temperature: 0.1, // 降低随机性，确保更一致的JSON输出
+      response_format: { type: "json_object" } // 强制JSON格式输出
     });
 
     const openaiResponseTime = performance.now() - openaiStartTime;
@@ -145,22 +152,31 @@ export async function POST(request: NextRequest) {
     // 解析 JSON 响应
     let analysisResult;
     try {
-      // 尝试提取 JSON 部分
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        analysisResult = JSON.parse(jsonMatch[0]);
-        log.info('JSON parsing successful', { requestId });
-      } else {
-        throw new Error('无法从响应中提取 JSON');
-      }
+      // 由于使用了response_format: json_object，响应应该直接是JSON
+      analysisResult = JSON.parse(responseText);
+      log.info('JSON parsing successful', { requestId });
     } catch (parseError) {
       log.error('JSON parsing failed - AI analysis failed', parseError, { 
         requestId,
-        responseText: responseText.substring(0, 200) + '...'
+        responseText: responseText.substring(0, 500) // 增加日志长度以便调试
       });
       
-      // 不使用降级分析，直接抛出错误
-      throw new Error(`AI分析失败：无法解析OpenAI响应。${parseError instanceof Error ? parseError.message : '未知错误'}`);
+      // 尝试提取JSON部分作为备用方案
+      try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          analysisResult = JSON.parse(jsonMatch[0]);
+          log.info('JSON extraction successful as fallback', { requestId });
+        } else {
+          throw new Error('无法从响应中提取 JSON');
+        }
+      } catch (fallbackError) {
+        log.error('Fallback JSON extraction also failed', fallbackError, { 
+          requestId,
+          responseText: responseText
+        });
+        throw new Error(`AI分析失败：OpenAI返回了非JSON格式的响应。响应内容：${responseText.substring(0, 200)}`);
+      }
     }
 
     // 验证和清理数据

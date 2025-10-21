@@ -33,7 +33,7 @@ export default function Navigation() {
     console.log('[DEBUG] Navigation: 组件已挂载');
     console.log('[DEBUG] Navigation: 当前路径:', pathname);
     console.log('[DEBUG] Navigation: 可用路由:', navigation.map(n => n.href));
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     console.log('[DEBUG] Navigation: 路径变化:', pathname);

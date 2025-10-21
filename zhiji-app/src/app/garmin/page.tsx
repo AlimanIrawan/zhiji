@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Activity, Sync, Heart, Footprints, Zap, Settings, AlertCircle, CheckCircle } from 'lucide-react';
+import { Activity, RefreshCw, Heart, Footprints, Zap, Settings, AlertCircle, CheckCircle } from 'lucide-react';
 import Navigation from '@/components/layout/navigation';
 
 interface GarminData {
@@ -176,7 +176,7 @@ export default function GarminPage() {
                 disabled={isSyncing || !isConfigured}
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-primary-700 disabled:opacity-50"
               >
-                <Sync className={`h-5 w-5 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-5 w-5 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
                 {isSyncing ? '同步中...' : '立即同步'}
               </button>
             </div>

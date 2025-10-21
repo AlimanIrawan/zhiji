@@ -5,14 +5,14 @@ export async function GET(request: NextRequest) {
   console.log('[DEBUG] DB Test API: 开始数据库连接测试');
   
   try {
-    // 检查环境变量
-    const kvUrl = process.env.KV_REST_API_URL;
-    const kvToken = process.env.KV_REST_API_TOKEN;
+    // 检查环境变量 - 使用正确的环境变量名称
+    const kvUrl = process.env.ZHIJI_KV_REST_API_URL;
+    const kvToken = process.env.ZHIJI_KV_REST_API_TOKEN;
     
     console.log('[DEBUG] DB Test: 环境变量检查');
-    console.log('[DEBUG] DB Test: KV_REST_API_URL存在:', !!kvUrl);
-    console.log('[DEBUG] DB Test: KV_REST_API_TOKEN存在:', !!kvToken);
-    console.log('[DEBUG] DB Test: KV_REST_API_URL值:', kvUrl?.substring(0, 50) + '...');
+    console.log('[DEBUG] DB Test: ZHIJI_KV_REST_API_URL存在:', !!kvUrl);
+    console.log('[DEBUG] DB Test: ZHIJI_KV_REST_API_TOKEN存在:', !!kvToken);
+    console.log('[DEBUG] DB Test: ZHIJI_KV_REST_API_URL值:', kvUrl?.substring(0, 50) + '...');
     
     if (!kvUrl || !kvToken) {
       console.error('[DEBUG] DB Test: 缺少必需的环境变量');
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         details: {
           hasUrl: !!kvUrl,
           hasToken: !!kvToken,
-          message: '请在.env.local文件中配置KV_REST_API_URL和KV_REST_API_TOKEN'
+          message: '请在Vercel环境变量中配置ZHIJI_KV_REST_API_URL和ZHIJI_KV_REST_API_TOKEN'
         }
       }, { status: 500 });
     }

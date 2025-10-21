@@ -52,41 +52,88 @@ class VercelKVAdapter implements StorageAdapter {
     try {
       const { kv } = require('@vercel/kv');
       this.kv = kv;
+      console.log('Vercel KV adapter initialized successfully');
     } catch (error) {
+      console.error('Failed to initialize Vercel KV adapter:', error);
       throw new Error('Vercel KV not available');
     }
   }
 
   async hgetall(key: string): Promise<Record<string, any> | null> {
-    return await this.kv.hgetall(key);
+    try {
+      const result = await this.kv.hgetall(key);
+      console.log(`KV hgetall ${key}:`, result ? 'found' : 'not found');
+      return result;
+    } catch (error) {
+      console.error(`KV hgetall error for key ${key}:`, error);
+      throw error;
+    }
   }
 
   async hset(key: string, data: Record<string, any>): Promise<void> {
-    await this.kv.hset(key, data);
+    try {
+      await this.kv.hset(key, data);
+      console.log(`KV hset ${key}: success`);
+    } catch (error) {
+      console.error(`KV hset error for key ${key}:`, error);
+      throw error;
+    }
   }
 
   async get(key: string): Promise<string | null> {
-    return await this.kv.get(key);
+    try {
+      const result = await this.kv.get(key);
+      console.log(`KV get ${key}:`, result ? 'found' : 'not found');
+      return result;
+    } catch (error) {
+      console.error(`KV get error for key ${key}:`, error);
+      throw error;
+    }
   }
 
   async set(key: string, value: string): Promise<void> {
-    await this.kv.set(key, value);
+    try {
+      await this.kv.set(key, value);
+      console.log(`KV set ${key}: success`);
+    } catch (error) {
+      console.error(`KV set error for key ${key}:`, error);
+      throw error;
+    }
   }
 
   async del(key: string): Promise<void> {
-    await this.kv.del(key);
+    try {
+      await this.kv.del(key);
+      console.log(`KV del ${key}: success`);
+    } catch (error) {
+      console.error(`KV del error for key ${key}:`, error);
+      throw error;
+    }
   }
 
   async keys(pattern: string): Promise<string[]> {
-    return await this.kv.keys(pattern);
+    try {
+      const result = await this.kv.keys(pattern);
+      console.log(`KV keys ${pattern}: found ${result.length} keys`);
+      return result;
+    } catch (error) {
+      console.error(`KV keys error for pattern ${pattern}:`, error);
+      throw error;
+    }
   }
 }
 
 // 存储工厂函数
 function createStorage(): StorageAdapter {
-  // 检查是否配置了 Vercel KV
-  const kvUrl = process.env.KV_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN;
+  // 检查是否配置了 Vercel KV - 使用正确的环境变量名称
+  const kvUrl = process.env.ZHIJI_KV_REST_API_URL;
+  const kvToken = process.env.ZHIJI_KV_REST_API_TOKEN;
+  
+  console.log('Environment check:', {
+    kvUrl: kvUrl ? 'configured' : 'not configured',
+    kvToken: kvToken ? 'configured' : 'not configured',
+    nodeEnv: process.env.NODE_ENV
+  });
   
   if (kvUrl && kvToken && 
       kvUrl !== 'your_kv_rest_api_url' && 

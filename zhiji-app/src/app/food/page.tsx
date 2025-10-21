@@ -327,7 +327,7 @@ export default function FoodPage() {
   // 复制记录到分析区域
   const copyRecordToAnalysis = (record: FoodRecord) => {
     log.userAction('Copy record to analysis', { recordId: record.id });
-    setDescription(record.description || record.foodName);
+    setDescription(record.description);
     // 如果有图片数据，这里可以设置图片
     setShowAddForm(true);
     // 滚动到顶部

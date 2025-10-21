@@ -132,7 +132,7 @@ class OpenAIService:
             response = self.client.chat.completions.create(
                 model="gpt-4o",  # 使用最新的GPT-4o模型（支持视觉）
                 messages=messages,
-                max_tokens=500,
+                max_completion_tokens=500,
                 temperature=0.7
             )
             

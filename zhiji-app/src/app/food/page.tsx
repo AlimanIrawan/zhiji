@@ -600,7 +600,7 @@ export default function FoodPage() {
                     <div key={record.id} className="p-6 hover:bg-gray-50">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{record.description || record.foodName}</h3>
+                          <h3 className="font-medium text-gray-900">{record.description}</h3>
                           <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-gray-600">
                             <div>热量: {record.nutrition.calories} kcal</div>
                             <div>蛋白质: {record.nutrition.protein}g</div>

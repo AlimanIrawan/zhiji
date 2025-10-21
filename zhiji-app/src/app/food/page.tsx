@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Upload, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Camera, Upload, Loader2, AlertCircle, CheckCircle, Plus, Trash2, Calendar } from 'lucide-react';
 import Navigation from '@/components/layout/navigation';
 import { FoodRecord } from '@/types';
 import { log } from '@/lib/logger';
@@ -25,33 +25,32 @@ interface AnalysisResult {
 
 export default function FoodPage() {
   const [records, setRecords] = useState<FoodRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // 新增状态
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [description, setDescription] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     log.info('FoodPage component mounted');
     log.info('FoodPage - Component mount start');
-    loadFoodRecords();
-  }, []);
+    loadFoodRecords(selectedDate);
+  }, [selectedDate]);
 
-  const loadFoodRecords = async () => {
+  const loadFoodRecords = async (date?: string) => {
     const startTime = performance.now();
+    const targetDate = date || new Date().toISOString().split('T')[0];
     
     try {
-      log.info('Loading food records');
-      log.apiRequest('GET', '/api/food/records', {});
+      log.info('Loading food records', { date: targetDate });
+      log.apiRequest('GET', '/api/food/records', { date: targetDate });
       
-      const response = await fetch('/api/food/records');
+      const response = await fetch(`/api/food/records?date=${targetDate}`);
       const responseTime = performance.now() - startTime;
       
       log.apiResponse('GET', '/api/food/records', response.status, responseTime, {
@@ -65,27 +64,31 @@ export default function FoodPage() {
       const data = await response.json();
       log.info('Food records loaded successfully', {
         recordCount: data.data?.length || 0,
-        success: data.success
+        success: data.success,
+        date: targetDate
       });
       
       if (data.success) {
         setRecords(data.data || []);
         log.info('FoodPage - Records loaded', {
           count: data.data?.length || 0,
-          loadTime: `${responseTime.toFixed(2)}ms`
+          loadTime: `${responseTime.toFixed(2)}ms`,
+          date: targetDate
         });
       } else {
         throw new Error(data.error || '获取数据失败');
       }
     } catch (error) {
       log.error('Failed to load food records', error, {
-        responseTime: `${(performance.now() - startTime).toFixed(2)}ms`
+        responseTime: `${(performance.now() - startTime).toFixed(2)}ms`,
+        date: targetDate
       });
       setError(error instanceof Error ? error.message : '加载失败');
     } finally {
       setIsLoading(false);
       log.info('FoodPage - Loading completed', {
-        totalTime: `${(performance.now() - startTime).toFixed(2)}ms`
+        totalTime: `${(performance.now() - startTime).toFixed(2)}ms`,
+        date: targetDate
       });
     }
   };
@@ -258,11 +261,13 @@ export default function FoodPage() {
 
     try {
       const requestData = {
-        foodName: analysisResult.foodName,
+        foodName: description || analysisResult.foodName, // 使用用户描述作为食品名称
+        description: description, // 保存用户描述
         nutrition: analysisResult.nutrition,
         tags: analysisResult.tags,
         healthScore: analysisResult.healthScore,
         suggestions: analysisResult.suggestions,
+        recordDate: new Date().toISOString().split('T')[0], // 添加记录日期
       };
       
       log.apiRequest('POST', '/api/food/records', requestData);
@@ -313,14 +318,56 @@ export default function FoodPage() {
     }
   };
 
+  // 处理日期变化
+  const handleDateChange = (date: string) => {
+    log.userAction('Date changed', { date });
+    setSelectedDate(date);
+  };
+
+  // 复制记录到分析区域
+  const copyRecordToAnalysis = (record: FoodRecord) => {
+    log.userAction('Copy record to analysis', { recordId: record.id });
+    setDescription(record.description || record.foodName);
+    // 如果有图片数据，这里可以设置图片
+    setShowAddForm(true);
+    // 滚动到顶部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // 删除记录
+  const deleteRecord = async (recordId: string) => {
+    if (!confirm('确定要删除这条记录吗？')) {
+      return;
+    }
+
+    log.userAction('Delete record', { recordId });
+    
+    try {
+      const response = await fetch(`/api/food/records/${recordId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        log.info('Record deleted successfully', { recordId });
+        // 重新加载记录
+        await loadFoodRecords(selectedDate);
+      } else {
+        throw new Error('删除失败');
+      }
+    } catch (error) {
+      log.error('Failed to delete record', error, { recordId });
+      setError(error instanceof Error ? error.message : '删除失败');
+    }
+  };
+
   // 处理描述输入变化
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setDescription(value);
     
     // 记录用户输入行为（节流记录，避免过多日志）
-    if (value.length % 10 === 0 || value.length === 0) {
-      log.userAction('Description input changed', {
+    if (value.length % 10 === 0) {
+      log.userAction('Description input', {
         length: value.length,
         hasContent: value.trim().length > 0
       });
@@ -517,15 +564,35 @@ export default function FoodPage() {
             {/* 历史记录 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100">
               <div className="p-6 border-b border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-900">历史记录</h2>
-                <p className="text-gray-600 text-sm mt-1">共 {records.length} 条记录</p>
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">历史记录</h2>
+                    <p className="text-gray-600 text-sm mt-1">共 {records.length} 条记录</p>
+                  </div>
+                  
+                  {/* 日期选择器 */}
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
               </div>
               
               <div className="divide-y divide-gray-100">
                 {records.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
                     <Camera className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>还没有饮食记录</p>
+                    <p>
+                      {selectedDate === new Date().toISOString().split('T')[0] 
+                        ? '今天还没有饮食记录' 
+                        : '这一天没有饮食记录'
+                      }
+                    </p>
                     <p className="text-sm mt-1">点击上方"添加记录"开始记录您的饮食</p>
                   </div>
                 ) : (
@@ -533,7 +600,7 @@ export default function FoodPage() {
                     <div key={record.id} className="p-6 hover:bg-gray-50">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{record.description}</h3>
+                          <h3 className="font-medium text-gray-900">{record.description || record.foodName}</h3>
                           <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-gray-600">
                             <div>热量: {record.nutrition.calories} kcal</div>
                             <div>蛋白质: {record.nutrition.protein}g</div>
@@ -546,7 +613,26 @@ export default function FoodPage() {
                             </div>
                           )}
                         </div>
-                        <div className="ml-4 text-right">
+                        <div className="ml-4 flex flex-col items-end space-y-2">
+                          {/* 操作按钮 */}
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => copyRecordToAnalysis(record)}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                              title="复制到分析区域"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteRecord(record.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                              title="删除记录"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          
+                          {/* 健康评分 */}
                           {record.healthScore !== undefined && (
                             <div className={`px-2 py-1 rounded text-sm ${
                               record.healthScore >= 80 ? 'bg-green-100 text-green-800' :
@@ -556,8 +642,13 @@ export default function FoodPage() {
                               {record.healthScore}/100
                             </div>
                           )}
-                          <div className="text-xs text-gray-500 mt-1">
-                            {new Date(record.createdAt).toLocaleDateString()}
+                          
+                          {/* 时间 */}
+                          <div className="text-xs text-gray-500">
+                            {new Date(record.createdAt).toLocaleTimeString('zh-CN', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </div>
                         </div>
                       </div>

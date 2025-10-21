@@ -258,7 +258,7 @@ export default function FoodPage() {
 
     try {
       const requestData = {
-        description: analysisResult.foodName,
+        foodName: analysisResult.foodName,
         nutrition: analysisResult.nutrition,
         tags: analysisResult.tags,
         healthScore: analysisResult.healthScore,

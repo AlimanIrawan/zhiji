@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     log.externalService('OpenAI', 'API call initiated', {
       requestId,
-      model: image ? 'gpt-4o' : 'gpt-4',
+      model: 'gpt-5',
       messageCount: messages.length,
       hasImage: !!image
     });
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     // 调用 OpenAI API
     const openaiStartTime = performance.now();
     const completion = await openai.chat.completions.create({
-      model: image ? 'gpt-4o' : 'gpt-4',
+      model: 'gpt-5',
       messages: messages,
       max_tokens: 1000,
       temperature: 0.3,
@@ -155,27 +155,13 @@ export async function POST(request: NextRequest) {
         throw new Error('无法从响应中提取 JSON');
       }
     } catch (parseError) {
-      log.error('JSON parsing failed, using fallback result', parseError, { 
+      log.error('JSON parsing failed - AI analysis failed', parseError, { 
         requestId,
         responseText: responseText.substring(0, 200) + '...'
       });
       
-      // 如果解析失败，返回默认结果
-      analysisResult = {
-        foodName: description || '未知食物',
-        portion: '1份',
-        nutrition: {
-          calories: 200,
-          protein: 10,
-          carbs: 30,
-          fat: 8,
-          fiber: 3,
-          sugar: 5
-        },
-        healthScore: 60,
-        tags: ['普通食物'],
-        suggestions: '建议搭配蔬菜和水果，保持营养均衡。'
-      };
+      // 不使用降级分析，直接抛出错误
+      throw new Error(`AI分析失败：无法解析OpenAI响应。${parseError instanceof Error ? parseError.message : '未知错误'}`);
     }
 
     // 验证和清理数据

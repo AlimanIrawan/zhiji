@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    log.externalService('OpenAI API call initiated', {
+    log.externalService('OpenAI', 'API call initiated', {
       requestId,
       model: image ? 'gpt-4-vision-preview' : 'gpt-4',
       messageCount: messages.length,
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     const openaiResponseTime = performance.now() - openaiStartTime;
     
-    log.externalService('OpenAI API response received', {
+    log.externalService('OpenAI', 'API response received', {
       requestId,
       responseTime: `${openaiResponseTime.toFixed(2)}ms`,
       tokensUsed: completion.usage?.total_tokens || 0,

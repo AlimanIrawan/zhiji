@@ -40,7 +40,7 @@ export default function FoodPage() {
 
   useEffect(() => {
     log.info('FoodPage component mounted');
-    log.performance('FoodPage - Component mount start');
+    log.info('FoodPage - Component mount start');
     loadFoodRecords();
   }, []);
 
@@ -49,14 +49,12 @@ export default function FoodPage() {
     
     try {
       log.info('Loading food records');
-      log.apiRequest('GET /api/food/records', {});
+      log.apiRequest('GET', '/api/food/records', {});
       
       const response = await fetch('/api/food/records');
       const responseTime = performance.now() - startTime;
       
-      log.apiResponse('GET /api/food/records', {
-        status: response.status,
-        responseTime: `${responseTime.toFixed(2)}ms`,
+      log.apiResponse('GET', '/api/food/records', response.status, responseTime, {
         ok: response.ok
       });
       
@@ -72,7 +70,7 @@ export default function FoodPage() {
       
       if (data.success) {
         setRecords(data.data || []);
-        log.performance('FoodPage - Records loaded', {
+        log.info('FoodPage - Records loaded', {
           count: data.data?.length || 0,
           loadTime: `${responseTime.toFixed(2)}ms`
         });
@@ -86,7 +84,7 @@ export default function FoodPage() {
       setError(error instanceof Error ? error.message : '加载失败');
     } finally {
       setIsLoading(false);
-      log.performance('FoodPage - Loading completed', {
+      log.info('FoodPage - Loading completed', {
         totalTime: `${(performance.now() - startTime).toFixed(2)}ms`
       });
     }
@@ -191,7 +189,7 @@ export default function FoodPage() {
         description: description.trim() || null,
       };
       
-      log.apiRequest('POST /api/food/analyze', {
+      log.apiRequest('POST', '/api/food/analyze', {
         hasImage: !!imageBase64,
         hasDescription: !!requestData.description,
         descriptionLength: requestData.description?.length || 0
@@ -207,9 +205,7 @@ export default function FoodPage() {
 
       const responseTime = performance.now() - startTime;
       
-      log.apiResponse('POST /api/food/analyze', {
-        status: response.status,
-        responseTime: `${responseTime.toFixed(2)}ms`,
+      log.apiResponse('POST', '/api/food/analyze', response.status, responseTime, {
         ok: response.ok
       });
 
@@ -240,7 +236,7 @@ export default function FoodPage() {
       setError(error instanceof Error ? error.message : '分析失败');
     } finally {
       setIsAnalyzing(false);
-      log.performance('FoodPage - Analysis completed', {
+      log.info('FoodPage - Analysis completed', {
         totalTime: `${(performance.now() - startTime).toFixed(2)}ms`
       });
     }
@@ -269,7 +265,7 @@ export default function FoodPage() {
         suggestions: analysisResult.suggestions,
       };
       
-      log.apiRequest('POST /api/food/records', requestData);
+      log.apiRequest('POST', '/api/food/records', requestData);
 
       const response = await fetch('/api/food/records', {
         method: 'POST',
@@ -281,9 +277,7 @@ export default function FoodPage() {
 
       const responseTime = performance.now() - startTime;
       
-      log.apiResponse('POST /api/food/records', {
-        status: response.status,
-        responseTime: `${responseTime.toFixed(2)}ms`,
+      log.apiResponse('POST', '/api/food/records', response.status, responseTime, {
         ok: response.ok
       });
 
@@ -546,27 +540,22 @@ export default function FoodPage() {
                             <div>碳水: {record.nutrition.carbs}g</div>
                             <div>脂肪: {record.nutrition.fat}g</div>
                           </div>
-                          {record.tags && record.tags.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {record.tags.map((tag, index) => (
-                                <span
-                                  key={index}
-                                  className="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
+                          {record.aiAdvice && (
+                            <div className="mt-2 text-sm text-gray-600">
+                              <strong>AI建议:</strong> {record.aiAdvice}
                             </div>
                           )}
                         </div>
                         <div className="ml-4 text-right">
-                          <div className={`px-2 py-1 rounded text-sm ${
-                            record.healthScore >= 80 ? 'bg-green-100 text-green-800' :
-                            record.healthScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {record.healthScore}/100
-                          </div>
+                          {record.healthScore !== undefined && (
+                            <div className={`px-2 py-1 rounded text-sm ${
+                              record.healthScore >= 80 ? 'bg-green-100 text-green-800' :
+                              record.healthScore >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {record.healthScore}/100
+                            </div>
+                          )}
                           <div className="text-xs text-gray-500 mt-1">
                             {new Date(record.createdAt).toLocaleDateString()}
                           </div>

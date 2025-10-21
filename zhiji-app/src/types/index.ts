@@ -250,6 +250,7 @@ export interface FoodRecord {
   aiAdvice?: string;
   imageUrl?: string;
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  healthScore?: number;
   createdAt: string;
   updatedAt: string;
 }

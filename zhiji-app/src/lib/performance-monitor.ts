@@ -70,11 +70,7 @@ export class PerformanceMonitor {
             const entries = list.getEntries();
             const lastEntry = entries[entries.length - 1];
             if (lastEntry) {
-              log.performance('Largest Contentful Paint (LCP)', {
-                value: `${lastEntry.startTime.toFixed(2)}ms`,
-                element: (lastEntry as any).element?.tagName || 'unknown',
-                url: (lastEntry as any).url || window.location.href
-              });
+              log.performance('Largest Contentful Paint (LCP)', lastEntry.startTime, 'ms');
             }
           });
           lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
@@ -86,11 +82,8 @@ export class PerformanceMonitor {
           const fidObserver = new PerformanceObserver((list) => {
             const entries = list.getEntries();
             entries.forEach((entry) => {
-              log.performance('First Input Delay (FID)', {
-                value: `${entry.processingStart - entry.startTime}ms`,
-                inputType: (entry as any).name || 'unknown',
-                startTime: `${entry.startTime.toFixed(2)}ms`
-              });
+              const fidEntry = entry as any;
+              log.performance('First Input Delay (FID)', fidEntry.processingStart - fidEntry.startTime, 'ms');
             });
           });
           fidObserver.observe({ entryTypes: ['first-input'] });
@@ -110,10 +103,7 @@ export class PerformanceMonitor {
             
             // 定期报告 CLS 值
             if (clsValue > 0.1) { // 只报告较大的布局偏移
-              log.performance('Cumulative Layout Shift (CLS)', {
-                value: clsValue.toFixed(4),
-                threshold: clsValue > 0.25 ? 'poor' : clsValue > 0.1 ? 'needs-improvement' : 'good'
-              });
+              log.performance('Cumulative Layout Shift (CLS)', clsValue);
             }
           });
           clsObserver.observe({ entryTypes: ['layout-shift'] });
@@ -130,53 +120,35 @@ export class PerformanceMonitor {
    */
   private logNavigationTiming(entry: PerformanceNavigationTiming) {
     const timing = {
-      // DNS 查询时间
-      dnsLookup: `${(entry.domainLookupEnd - entry.domainLookupStart).toFixed(2)}ms`,
-      // TCP 连接时间
-      tcpConnect: `${(entry.connectEnd - entry.connectStart).toFixed(2)}ms`,
-      // SSL 握手时间
-      sslHandshake: entry.secureConnectionStart > 0 
-        ? `${(entry.connectEnd - entry.secureConnectionStart).toFixed(2)}ms` 
-        : '0ms',
-      // 请求响应时间
-      requestResponse: `${(entry.responseEnd - entry.requestStart).toFixed(2)}ms`,
-      // DOM 解析时间
-      domParsing: `${(entry.domContentLoadedEventEnd - entry.responseEnd).toFixed(2)}ms`,
-      // 资源加载时间
-      resourceLoading: `${(entry.loadEventEnd - entry.domContentLoadedEventEnd).toFixed(2)}ms`,
-      // 总加载时间
-      totalLoad: `${(entry.loadEventEnd - entry.navigationStart).toFixed(2)}ms`,
-      // 首次内容绘制
-      firstContentfulPaint: this.getFirstContentfulPaint(),
-      // 导航类型
-      navigationType: this.getNavigationType(entry.type)
+      dnsLookup: entry.domainLookupEnd - entry.domainLookupStart,
+      tcpConnect: entry.connectEnd - entry.connectStart,
+      request: entry.responseStart - entry.requestStart,
+      response: entry.responseEnd - entry.responseStart,
+      domProcessing: entry.domContentLoadedEventStart - entry.responseEnd,
+      domComplete: entry.domComplete - entry.domContentLoadedEventStart,
+      loadComplete: entry.loadEventEnd - entry.loadEventStart,
+      total: entry.loadEventEnd - entry.fetchStart
     };
 
-    log.performance('Page Navigation Timing', timing);
+    log.info('Page Navigation Timing', timing);
   }
 
-  /**
-   * 记录资源加载性能
-   */
   private logResourceTiming(entry: PerformanceResourceTiming) {
-    // 只记录较慢的资源加载
     const duration = entry.responseEnd - entry.startTime;
-    if (duration > 100) { // 超过100ms的资源
-      log.performance('Slow Resource Loading', {
-        name: entry.name,
+    
+    // 只记录较慢的资源加载
+    if (duration > 1000) { // 超过1秒
+      log.warn('Slow Resource Loading', {
+        url: entry.name,
         duration: `${duration.toFixed(2)}ms`,
-        size: entry.transferSize ? `${(entry.transferSize / 1024).toFixed(2)}KB` : 'unknown',
         type: this.getResourceType(entry.name),
-        cached: entry.transferSize === 0 && entry.decodedBodySize > 0
+        size: entry.transferSize || 'unknown'
       });
     }
   }
 
-  /**
-   * 记录长任务
-   */
   private logLongTask(entry: PerformanceEntry) {
-    log.performance('Long Task Detected', {
+    log.warn('Long Task Detected', {
       duration: `${entry.duration.toFixed(2)}ms`,
       startTime: `${entry.startTime.toFixed(2)}ms`,
       name: entry.name || 'unknown'
@@ -196,100 +168,81 @@ export class PerformanceMonitor {
   public endTimer(name: string, metadata?: Record<string, any>): number {
     const startTime = this.timers.get(name);
     if (!startTime) {
-      log.warn(`Timer "${name}" not found`);
+      log.warn(`Timer "${name}" was not started`);
       return 0;
     }
 
     const duration = performance.now() - startTime;
     this.timers.delete(name);
 
-    log.performance(`Timer: ${name}`, {
-      duration: `${duration.toFixed(2)}ms`,
-      ...metadata
-    });
+    log.performance(`Timer: ${name}`, duration, 'ms');
+    
+    if (metadata) {
+      log.info(`Timer metadata for ${name}`, metadata);
+    }
 
     return duration;
   }
 
-  /**
-   * 测量函数执行时间
-   */
   public async measureAsync<T>(
     name: string, 
     fn: () => Promise<T>, 
     metadata?: Record<string, any>
   ): Promise<T> {
     const startTime = performance.now();
+    
     try {
       const result = await fn();
       const duration = performance.now() - startTime;
       
-      log.performance(`Async Function: ${name}`, {
-        duration: `${duration.toFixed(2)}ms`,
-        success: true,
-        ...metadata
-      });
+      log.performance(`Async Function: ${name}`, duration, 'ms');
+      
+      if (metadata) {
+        log.info(`Async function metadata for ${name}`, metadata);
+      }
       
       return result;
     } catch (error) {
       const duration = performance.now() - startTime;
-      
-      log.performance(`Async Function: ${name}`, {
-        duration: `${duration.toFixed(2)}ms`,
-        success: false,
-        error: error instanceof Error ? error.message : 'unknown',
-        ...metadata
-      });
-      
+      log.performance(`Async Function: ${name}`, duration, 'ms');
+      log.error(`Async function ${name} failed`, error, metadata);
       throw error;
     }
   }
 
-  /**
-   * 测量同步函数执行时间
-   */
   public measure<T>(
     name: string, 
     fn: () => T, 
     metadata?: Record<string, any>
   ): T {
     const startTime = performance.now();
+    
     try {
       const result = fn();
       const duration = performance.now() - startTime;
       
-      log.performance(`Function: ${name}`, {
-        duration: `${duration.toFixed(2)}ms`,
-        success: true,
-        ...metadata
-      });
+      log.performance(`Function: ${name}`, duration, 'ms');
+      
+      if (metadata) {
+        log.info(`Function metadata for ${name}`, metadata);
+      }
       
       return result;
     } catch (error) {
       const duration = performance.now() - startTime;
-      
-      log.performance(`Function: ${name}`, {
-        duration: `${duration.toFixed(2)}ms`,
-        success: false,
-        error: error instanceof Error ? error.message : 'unknown',
-        ...metadata
-      });
-      
+      log.performance(`Function: ${name}`, duration, 'ms');
+      log.error(`Function ${name} failed`, error, metadata);
       throw error;
     }
   }
 
-  /**
-   * 记录内存使用情况
-   */
   public logMemoryUsage(): void {
-    if (typeof window !== 'undefined' && 'memory' in performance) {
+    if ('memory' in performance) {
       const memory = (performance as any).memory;
-      log.performance('Memory Usage', {
-        used: `${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)}MB`,
-        total: `${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)}MB`,
-        limit: `${(memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2)}MB`,
-        usage: `${((memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100).toFixed(2)}%`
+      log.info('Memory Usage', {
+        used: `${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB`,
+        total: `${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)} MB`,
+        limit: `${(memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2)} MB`
       });
     }
   }

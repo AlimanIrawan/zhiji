@@ -134,7 +134,24 @@ export class FoodService {
       }
 
       return Object.values(records)
-        .map(record => JSON.parse(record as string) as FoodRecord)
+        .map(record => {
+          // 检查记录是否已经是对象
+          if (typeof record === 'object' && record !== null) {
+            return record as FoodRecord;
+          }
+          // 如果是字符串，尝试解析JSON
+          if (typeof record === 'string') {
+            try {
+              return JSON.parse(record) as FoodRecord;
+            } catch (parseError) {
+              console.error('Failed to parse record:', record, parseError);
+              return null;
+            }
+          }
+          console.error('Invalid record format:', record);
+          return null;
+        })
+        .filter((record): record is FoodRecord => record !== null)
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } catch (error) {
       console.error('Error getting food records:', error);
@@ -182,7 +199,22 @@ export class FoodService {
         const records = await storage.hgetall(recordKey);
         
         if (records && records[recordId]) {
-          return JSON.parse(records[recordId] as string) as FoodRecord;
+          const record = records[recordId];
+          // 检查记录是否已经是对象
+          if (typeof record === 'object' && record !== null) {
+            return record as FoodRecord;
+          }
+          // 如果是字符串，尝试解析JSON
+          if (typeof record === 'string') {
+            try {
+              return JSON.parse(record) as FoodRecord;
+            } catch (parseError) {
+              console.error('Failed to parse single record:', record, parseError);
+              return null;
+            }
+          }
+          console.error('Invalid single record format:', record);
+          return null;
         }
       }
       
@@ -208,7 +240,24 @@ export class FoodService {
         const records = await storage.hgetall(recordKey);
         
         if (records && records[recordId]) {
-          const record = JSON.parse(records[recordId] as string) as FoodRecord;
+          const existingRecord = records[recordId];
+          let record: FoodRecord;
+          
+          // 检查记录是否已经是对象
+          if (typeof existingRecord === 'object' && existingRecord !== null) {
+            record = existingRecord as FoodRecord;
+          } else if (typeof existingRecord === 'string') {
+            try {
+              record = JSON.parse(existingRecord) as FoodRecord;
+            } catch (parseError) {
+              console.error('Failed to parse record for update:', existingRecord, parseError);
+              return false;
+            }
+          } else {
+            console.error('Invalid record format for update:', existingRecord);
+            return false;
+          }
+          
           const updatedRecord = {
             ...record,
             ...updates,

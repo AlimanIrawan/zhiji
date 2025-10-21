@@ -27,6 +27,11 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // 设置环境变量映射 - @vercel/kv 包需要标准的环境变量名称
+    process.env.KV_REST_API_URL = kvUrl;
+    process.env.KV_REST_API_TOKEN = kvToken;
+    console.log('[DEBUG] DB Test: 环境变量映射完成 ZHIJI_KV_* -> KV_*');
+
     // 测试基本连接
     console.log('[DEBUG] DB Test: 尝试连接到KV数据库');
     const testKey = `test:${Date.now()}`;

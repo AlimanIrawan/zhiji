@@ -48,6 +48,22 @@ class VercelKVAdapter implements StorageAdapter {
   private kv: any;
 
   constructor() {
+    // 设置环境变量映射 - @vercel/kv 包需要标准的环境变量名称
+    const zhijiKvUrl = process.env.ZHIJI_KV_REST_API_URL;
+    const zhijiKvToken = process.env.ZHIJI_KV_REST_API_TOKEN;
+    
+    if (zhijiKvUrl && zhijiKvToken) {
+      // 将自定义环境变量映射到 @vercel/kv 包期望的标准名称
+      process.env.KV_REST_API_URL = zhijiKvUrl;
+      process.env.KV_REST_API_TOKEN = zhijiKvToken;
+      console.log('Environment variables mapped for @vercel/kv:', {
+        from: 'ZHIJI_KV_*',
+        to: 'KV_*',
+        hasUrl: !!zhijiKvUrl,
+        hasToken: !!zhijiKvToken
+      });
+    }
+    
     // 动态导入 @vercel/kv 以避免在没有配置时出错
     try {
       const { kv } = require('@vercel/kv');

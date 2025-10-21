@@ -1,0 +1,283 @@
+'use client';
+
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { 
+  Flame, 
+  Target, 
+  Activity, 
+  TrendingUp,
+  Calendar,
+  Clock
+} from 'lucide-react';
+import Navigation from '@/components/layout/navigation';
+import StatsCard from '@/components/dashboard/stats-card';
+import QuickActions from '@/components/dashboard/quick-actions';
+import ProgressRing from '@/components/ui/progress-ring';
+import { format } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
+
+interface DashboardData {
+  todayCalories: number;
+  calorieGoal: number;
+  todaySteps: number;
+  stepGoal: number;
+  weeklyProgress: number;
+  recentMeals: any[];
+}
+
+export default function HomePage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    todayCalories: 0,
+    calorieGoal: 2000,
+    todaySteps: 0,
+    stepGoal: 10000,
+    weeklyProgress: 0,
+    recentMeals: [],
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+
+    // 模拟加载仪表板数据
+    const loadDashboardData = async () => {
+      try {
+        // 这里应该调用实际的API
+        // const response = await fetch('/api/dashboard');
+        // const data = await response.json();
+        
+        // 模拟数据
+        setDashboardData({
+          todayCalories: 1450,
+          calorieGoal: 2000,
+          todaySteps: 7500,
+          stepGoal: 10000,
+          weeklyProgress: 68,
+          recentMeals: [
+            { id: '1', name: '早餐：燕麦粥', calories: 320, time: '08:30' },
+            { id: '2', name: '午餐：鸡胸肉沙拉', calories: 450, time: '12:30' },
+            { id: '3', name: '下午茶：苹果', calories: 80, time: '15:00' },
+          ],
+        });
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [session, status, router]);
+
+  if (status === 'loading' || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null;
+  }
+
+  const calorieProgress = (dashboardData.todayCalories / dashboardData.calorieGoal) * 100;
+  const stepProgress = (dashboardData.todaySteps / dashboardData.stepGoal) * 100;
+  const today = format(new Date(), 'yyyy年MM月dd日 EEEE', { locale: zhCN });
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navigation />
+      
+      {/* Main Content */}
+      <main className="pt-16 pb-20 md:pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              你好，{session.user?.name}！
+            </h1>
+            <p className="text-gray-600 flex items-center">
+              <Calendar className="h-4 w-4 mr-2" />
+              {today}
+            </p>
+          </div>
+
+          {/* Progress Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {/* Calorie Progress */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">今日卡路里</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <ProgressRing
+                    progress={Math.min(calorieProgress, 100)}
+                    size={120}
+                    color="#3B82F6"
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {dashboardData.todayCalories}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        / {dashboardData.calorieGoal}
+                      </div>
+                    </div>
+                  </ProgressRing>
+                </div>
+                <div className="ml-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                      <span className="text-sm text-gray-600">已摄入</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-gray-200 rounded-full mr-2"></div>
+                      <span className="text-sm text-gray-600">剩余</span>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-500">
+                      剩余 {Math.max(0, dashboardData.calorieGoal - dashboardData.todayCalories)} 卡路里
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Steps Progress */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">今日步数</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <ProgressRing
+                    progress={Math.min(stepProgress, 100)}
+                    size={120}
+                    color="#10B981"
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {dashboardData.todaySteps.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-500">步</div>
+                    </div>
+                  </ProgressRing>
+                </div>
+                <div className="ml-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                      <span className="text-sm text-gray-600">已完成</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-gray-200 rounded-full mr-2"></div>
+                      <span className="text-sm text-gray-600">目标</span>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-500">
+                      目标 {dashboardData.stepGoal.toLocaleString()} 步
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <StatsCard
+              title="本周进度"
+              value={dashboardData.weeklyProgress}
+              unit="%"
+              icon={TrendingUp}
+              color="bg-purple-500"
+              trend={{ value: 12, isPositive: true }}
+            />
+            <StatsCard
+              title="今日消耗"
+              value="2,340"
+              unit="卡路里"
+              icon={Flame}
+              color="bg-red-500"
+              trend={{ value: 8, isPositive: true }}
+            />
+            <StatsCard
+              title="活跃时间"
+              value="45"
+              unit="分钟"
+              icon={Activity}
+              color="bg-orange-500"
+              trend={{ value: 5, isPositive: false }}
+            />
+            <StatsCard
+              title="目标达成"
+              value="3"
+              unit="天"
+              icon={Target}
+              color="bg-green-500"
+              trend={{ value: 15, isPositive: true }}
+            />
+          </div>
+
+          {/* Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Recent Meals */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">最近用餐</h3>
+                  <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                    查看全部
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {dashboardData.recentMeals.map((meal) => (
+                    <div key={meal.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center mr-3">
+                          <Flame className="h-5 w-5 text-primary-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{meal.name}</p>
+                          <p className="text-sm text-gray-500 flex items-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {meal.time}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900">{meal.calories}</p>
+                        <p className="text-xs text-gray-500">卡路里</p>
+                      </div>
+                    </div>
+                  ))}
+                  {dashboardData.recentMeals.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">今天还没有用餐记录</p>
+                      <p className="text-sm text-gray-400 mt-1">开始记录您的第一餐吧！</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div>
+              <QuickActions />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -1,0 +1,45 @@
+{
+  "name": "zhiji-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@vercel/kv": "^1.0.1",
+    "@vercel/blob": "^0.15.1",
+    "next-auth": "^4.24.5",
+    "openai": "^4.20.0",
+    "lucide-react": "^0.294.0",
+    "recharts": "^2.8.0",
+    "date-fns": "^2.30.0",
+    "zustand": "^4.4.6",
+    "sonner": "^1.2.4",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/node": "^20.8.0",
+    "@types/react": "^18.2.25",
+    "@types/react-dom": "^18.2.10",
+    "tailwindcss": "^3.3.5",
+    "postcss": "^8.4.31",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.51.0",
+    "eslint-config-next": "^15.0.0",
+    "@tailwindcss/forms": "^0.5.6",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/uuid": "^9.0.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

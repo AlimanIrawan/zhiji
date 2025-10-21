@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     log.externalService('OpenAI', 'API call initiated', {
       requestId,
-      model: image ? 'gpt-4-vision-preview' : 'gpt-4',
+      model: image ? 'gpt-4o' : 'gpt-4',
       messageCount: messages.length,
       hasImage: !!image
     });
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     // 调用 OpenAI API
     const openaiStartTime = performance.now();
     const completion = await openai.chat.completions.create({
-      model: image ? 'gpt-4-vision-preview' : 'gpt-4',
+      model: image ? 'gpt-4o' : 'gpt-4',
       messages: messages,
       max_tokens: 1000,
       temperature: 0.3,

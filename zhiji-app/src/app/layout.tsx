@@ -3,6 +3,9 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { Toaster } from 'sonner';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { performanceMonitor } from '@/lib/performance-monitor';
+import { log } from '@/lib/logger';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,18 +23,40 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // 在客户端初始化性能监控
+  if (typeof window !== 'undefined') {
+    // 记录应用启动
+    log.info('Application started', {
+      userAgent: navigator.userAgent,
+      url: window.location.href,
+      timestamp: new Date().toISOString()
+    });
+
+    // 监控内存使用
+    setTimeout(() => {
+      performanceMonitor.logMemoryUsage();
+    }, 1000);
+
+    // 定期监控内存使用（每30秒）
+    setInterval(() => {
+      performanceMonitor.logMemoryUsage();
+    }, 30000);
+  }
+
   return (
     <html lang="zh-CN">
       <body className={inter.className}>
-        <Providers>
-          {children}
-          <Toaster 
-            position="top-center"
-            richColors
-            closeButton
-            duration={4000}
-          />
-        </Providers>
+        <ErrorBoundary>
+          <Providers>
+            {children}
+            <Toaster 
+              position="top-center"
+              richColors
+              closeButton
+              duration={4000}
+            />
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   );

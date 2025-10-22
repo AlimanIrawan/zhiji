@@ -339,10 +339,34 @@ export default function FoodPage() {
   };
 
   // 复制记录到分析区域
-  const copyRecordToAnalysis = (record: FoodRecord) => {
+  const copyRecordToAnalysis = async (record: FoodRecord) => {
     log.userAction('Copy record to analysis', { recordId: record.id });
     setDescription(record.description);
-    // 如果有图片数据，这里可以设置图片
+    
+    // 如果有图片URL，设置图片预览
+    if (record.imageUrl) {
+      try {
+        // 从URL获取图片并转换为File对象
+        const response = await fetch(record.imageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'image.jpg', { type: blob.type });
+        
+        setSelectedImage(file);
+        setImagePreview(record.imageUrl);
+        
+        log.info('Image loaded for editing', { imageUrl: record.imageUrl });
+      } catch (error) {
+        log.error('Failed to load image for editing', { error, imageUrl: record.imageUrl });
+        // 如果图片加载失败，清空图片状态
+        setSelectedImage(null);
+        setImagePreview(null);
+      }
+    } else {
+      // 清空图片状态
+      setSelectedImage(null);
+      setImagePreview(null);
+    }
+    
     setShowAddForm(true);
     // 滚动到顶部
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -614,13 +638,39 @@ export default function FoodPage() {
                     <div key={record.id} className="p-6 hover:bg-gray-50">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{record.description}</h3>
-                          <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-gray-600">
-                            <div>热量: {record.nutrition.calories} kcal</div>
-                            <div>蛋白质: {record.nutrition.protein}g</div>
-                            <div>碳水: {record.nutrition.carbs}g</div>
-                            <div>脂肪: {record.nutrition.fat}g</div>
+                          {/* 图片和标题区域 */}
+                          <div className="flex items-start space-x-4 mb-3">
+                            {/* 图片显示 */}
+                            {record.imageUrl ? (
+                              <div className="flex-shrink-0">
+                                <img 
+                                  src={record.imageUrl} 
+                                  alt={record.description}
+                                  className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                  onError={(e) => {
+                                    // 图片加载失败时隐藏图片元素
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                                <Camera className="h-6 w-6 text-gray-400" />
+                              </div>
+                            )}
+                            
+                            {/* 标题和营养信息 */}
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-gray-900">{record.description}</h3>
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-gray-600">
+                                <div>热量: {record.nutrition.calories} kcal</div>
+                                <div>蛋白质: {record.nutrition.protein}g</div>
+                                <div>碳水: {record.nutrition.carbs}g</div>
+                                <div>脂肪: {record.nutrition.fat}g</div>
+                              </div>
+                            </div>
                           </div>
+                          
                           {record.aiAdvice && (
                             <div className="mt-2 text-sm text-gray-600">
                               <strong>AI建议:</strong> {record.aiAdvice}

@@ -12,9 +12,11 @@ export async function GET(request: NextRequest) {
     console.log('[API] 请求参数 - 日期:', date, '天数:', days, '强制同步:', force);
     console.log('[API] 准备调用后端服务...');
     
-    // 调用后端API
-    const backendUrl = `http://localhost:5001/api/garmin/sync?date=${date}&days=${days}&force=${force}`;
+    // 调用后端API - 根据环境选择后端地址
+    const backendBaseUrl = process.env.BACKEND_URL || 'http://localhost:5001';
+    const backendUrl = `${backendBaseUrl}/api/garmin/sync?date=${date}&days=${days}&force=${force}`;
     console.log('[API] 后端URL:', backendUrl);
+    console.log('[API] 环境变量 BACKEND_URL:', process.env.BACKEND_URL);
     
     const response = await fetch(backendUrl, {
       method: 'POST',

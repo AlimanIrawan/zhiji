@@ -258,16 +258,45 @@ export interface FoodRecord {
 // 扩展 GarminData 接口
 export interface GarminData {
   userId: string;
-  syncDate: string; // YYYY-MM-DD
-  totalCalories: number;
-  activeCalories: number;
-  restingCalories: number;
-  steps: number;
-  distance: number; // 公里
-  floorsClimbed?: number;
-  heartRate: HeartRateData;
-  activities: ActivityData[];
-  trainingType: 'none' | 'A' | 'S' | 'both'; // A=有氧, S=力量
+  syncDate: string;
+  
+  // 过去7天基础数据（按天为单位）
+  last7Days: Array<{
+    date: string;
+    totalCalories: number;
+    activeCalories: number;
+    bmrCalories: number; // 基础代谢卡路里
+    steps: number;
+  }>;
+  
+  // 活动记录
+  activities: Array<{
+    name: string;
+    type: string;
+    duration: number; // 持续时间（秒）
+    calories: number; // 消耗卡路里
+    distance: number; // 距离（公里）
+  }>;
+  
+  // 睡眠分析
+  sleep: {
+    totalSleepTime: number; // 总睡眠时间（分钟）
+    deepSleep: number; // 深度睡眠（分钟）
+    lightSleep: number; // 浅度睡眠（分钟）
+    remSleep: number; // REM睡眠（分钟）
+    awakeTime: number; // 清醒时间（分钟）
+    sleepScore: number; // 睡眠评分
+  };
+  
+  // 身体指标
+  bodyMetrics: {
+    fitnessAge: number; // 体能年龄
+    hrv: {
+      lastNightAvg: number; // 昨夜平均HRV
+      status: string;
+    };
+  };
+  
   syncedAt: string;
 }
 

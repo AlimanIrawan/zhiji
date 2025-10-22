@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, Upload, Loader2, AlertCircle, CheckCircle, Plus, Trash2, Calendar, Info } from 'lucide-react';
 import Navigation from '@/components/layout/navigation';
 import { FoodRecord } from '@/types';
@@ -45,14 +45,8 @@ export default function FoodPage() {
   const [showHealthScoreInfo, setShowHealthScoreInfo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    log.info('FoodPage component mounted');
-    log.info('FoodPage - Component mount start');
-    loadInitialTimeline();
-  }, []);
-
   // 加载初始时间轴数据（最近7天）
-  const loadInitialTimeline = async () => {
+  const loadInitialTimeline = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -82,7 +76,13 @@ export default function FoodPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    log.info('FoodPage component mounted');
+    log.info('FoodPage - Component mount start');
+    loadInitialTimeline();
+  }, [loadInitialTimeline]);
 
   // 加载更多天数的数据
   const loadMoreDays = async () => {

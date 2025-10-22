@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Calendar, Activity, Heart, Moon, Zap } from 'lucide-react';
 
 interface GarminData {
@@ -50,7 +50,7 @@ export default function GarminTestPage() {
     new Date().toISOString().split('T')[0]
   );
 
-  const fetchGarminData = async () => {
+  const fetchGarminData = useCallback(async () => {
     console.log('[Garmin Test] 获取数据，日期:', selectedDate);
     setLoading(true);
     setError(null);
@@ -81,11 +81,11 @@ export default function GarminTestPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchGarminData();
-  }, [selectedDate]);
+  }, [fetchGarminData]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);

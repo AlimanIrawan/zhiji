@@ -250,27 +250,15 @@ export class FoodService {
 
 // Garmin数据服务类
 export class GarminService {
-  // 保存Garmin数据到KV存储和Blob存储
+  // 保存Garmin数据到Blob存储
   static async saveGarminData(data: Omit<GarminData, 'syncedAt'>): Promise<boolean> {
     try {
-      const garminKey = `user:${data.userId}:garmin:${data.syncDate}`;
       const fullData: GarminData = {
         ...data,
         syncedAt: new Date().toISOString(),
       };
 
-      // 保存到KV存储
-      await storage.hset(garminKey, {
-        userId: data.userId,
-        syncDate: data.syncDate,
-        last7Days: JSON.stringify(data.last7Days),
-        activities: JSON.stringify(data.activities),
-        sleep: JSON.stringify(data.sleep),
-        bodyMetrics: JSON.stringify(data.bodyMetrics),
-        syncedAt: fullData.syncedAt,
-      });
-
-      // 同时保存到Blob存储（新数据覆盖旧数据）
+      // 只保存到Blob存储
       await this.saveGarminDataToBlob(fullData);
 
       return true;
@@ -327,42 +315,8 @@ export class GarminService {
   // 获取指定日期的Garmin数据
   static async getGarminData(userId: string, date: string): Promise<GarminData | null> {
     try {
-      // 首先尝试从Blob存储获取
-      const blobData = await this.getGarminDataFromBlob(userId, date);
-      if (blobData) {
-        return blobData;
-      }
-
-      // 如果Blob中没有，从KV存储获取
-      const garminKey = `user:${userId}:garmin:${date}`;
-      const data = await storage.hgetall(garminKey);
-      
-      if (!data || Object.keys(data).length === 0) {
-        return null;
-      }
-
-      return {
-        userId: data.userId as string,
-        syncDate: data.syncDate as string,
-        last7Days: data.last7Days ? JSON.parse(data.last7Days as string) : [],
-        activities: data.activities ? JSON.parse(data.activities as string) : [],
-        sleep: data.sleep ? JSON.parse(data.sleep as string) : {
-          totalSleepTime: 0,
-          deepSleep: 0,
-          lightSleep: 0,
-          remSleep: 0,
-          awakeTime: 0,
-          sleepScore: 0
-        },
-        bodyMetrics: data.bodyMetrics ? JSON.parse(data.bodyMetrics as string) : {
-          fitnessAge: 0,
-          hrv: {
-            lastNightAvg: 0,
-            status: 'unknown'
-          }
-        },
-        syncedAt: data.syncedAt as string,
-      };
+      // 只从Blob存储获取
+      return await this.getGarminDataFromBlob(userId, date);
     } catch (error) {
       console.error('Error getting Garmin data:', error);
       return null;

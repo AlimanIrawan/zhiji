@@ -27,11 +27,15 @@
 - 使用 `garmin-connect` npm 包模拟登录 Garmin Connect
 - 无需申请官方开发者 API 密钥
 - 需要提供您的 Garmin Connect 账号和密码
-- 支持获取以下数据：
-  - 过去7天的基础数据（总卡路里、活动卡路里、基础代谢卡路里、步数）
-  - 活动记录（活动名称、类型、持续时间、消耗卡路里、距离）
-  - 睡眠分析（总睡眠时间、深度睡眠、浅度睡眠、REM睡眠、清醒时间、睡眠评分）
-  - 身体指标（体能年龄、HRV昨夜平均值）
+
+### 支持的数据类型
+由于 `garmin-connect` 库的 API 限制，目前支持获取以下数据：
+- ✅ **活动记录**: 活动名称、类型、持续时间、消耗卡路里、距离
+- ✅ **基础数据**: 通过活动记录汇总计算每日卡路里和步数
+- ⚠️ **睡眠分析**: 暂时无法获取（API限制）
+- ⚠️ **身体指标**: 暂时无法获取体能年龄和HRV数据（API限制）
+
+**注意**: 由于使用的是第三方开源库，某些高级数据（如睡眠分析、HRV、体能年龄等）可能无法获取。这些数据在界面中会显示为默认值或不可用状态。
 
 ### 安全性
 - 账号信息仅用于数据同步，不会被存储或传输给第三方
@@ -72,6 +76,9 @@ GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GITHUB_ID=your_github_id
 GITHUB_SECRET=your_github_secret
+
+# Vercel Blob 存储
+BLOB_READ_WRITE_TOKEN=your_blob_read_write_token
 
 # Garmin 配置 (使用 garmin-connect 库模拟登录)
 GARMIN_USERNAME=your_garmin_username

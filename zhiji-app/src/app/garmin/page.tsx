@@ -26,6 +26,10 @@ interface DayData {
     remSleep: number;
     awakeTime: number;
     sleepScore: number;
+    hrv: {
+      lastNightAvg: number; // 昨夜平均HRV
+      status: string;
+    };
   };
 }
 
@@ -33,7 +37,7 @@ interface GarminData {
   userId: string;
   syncDate: string;
   
-  // 过去7天基础数据（按天为单位）
+  // 过去7天的每日汇总数据
   last7Days: Array<{
     date: string;
     totalCalories: number;
@@ -42,7 +46,7 @@ interface GarminData {
     steps: number;
   }>;
   
-  // 活动记录
+  // 当日活动列表
   activities: Array<{
     name: string;
     type: string;
@@ -51,7 +55,7 @@ interface GarminData {
     distance: number; // 距离（公里）
   }>;
   
-  // 睡眠分析
+  // 当日睡眠数据
   sleep: {
     totalSleepTime: number; // 总睡眠时间（分钟）
     deepSleep: number; // 深度睡眠（分钟）
@@ -59,17 +63,12 @@ interface GarminData {
     remSleep: number; // REM睡眠（分钟）
     awakeTime: number; // 清醒时间（分钟）
     sleepScore: number; // 睡眠评分
-  };
-  
-  // 身体指标
-  bodyMetrics: {
-    fitnessAge: number; // 体能年龄
     hrv: {
       lastNightAvg: number; // 昨夜平均HRV
       status: string;
     };
   };
-  
+
   syncedAt: string;
 }
 
@@ -85,7 +84,7 @@ export default function GarminPage() {
 
   useEffect(() => {
     console.log('[DEBUG] GarminPage: 组件已挂载');
-    loadGarminData();
+    loadExistingData(); // 只加载已有数据，不自动同步
     
     // 启动自动同步调度器
     scheduler.setupDailySync();
@@ -95,6 +94,37 @@ export default function GarminPage() {
       scheduler.clearAllTimers();
     };
   }, []);
+
+  const loadExistingData = async () => {
+    try {
+      setIsLoading(true);
+      console.log('[DEBUG] GarminPage: 开始加载已有数据');
+      
+      // 获取过去7天的已有数据（不强制同步）
+      const response = await fetch('/api/garmin/sync?days=7&force=false');
+      const result = await response.json();
+      
+      if (result.success && result.data && result.data.length > 0) {
+        setGarminDataList(result.data);
+        setIsConfigured(true);
+        setLastSyncTime(result.last_sync);
+        
+        // 重新组织数据为按日期的格式
+        const organizedData = organizeDataByDate(result.data);
+        setDailyData(organizedData);
+        
+        console.log('[DEBUG] GarminPage: 已有数据加载成功:', result.data);
+      } else {
+        console.log('[DEBUG] GarminPage: 暂无已有数据');
+        setIsConfigured(false);
+      }
+    } catch (error) {
+      console.error('[ERROR] GarminPage: 数据加载失败:', error);
+      setIsConfigured(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const loadGarminData = async () => {
     try {
@@ -160,7 +190,11 @@ export default function GarminPage() {
           lightSleep: 0,
           remSleep: 0,
           awakeTime: 0,
-          sleepScore: 0
+          sleepScore: 0,
+          hrv: {
+            lastNightAvg: 0,
+            status: 'unknown'
+          }
         }
       };
     });
@@ -378,13 +412,12 @@ export default function GarminPage() {
 
   const getLatestHealthMetrics = () => {
     if (garminDataList.length === 0) {
-      return { fitnessAge: null, hrv: null };
+      return { hrv: null };
     }
     
     const latestData = garminDataList[0];
     return {
-      fitnessAge: latestData.bodyMetrics?.fitnessAge || null,
-      hrv: latestData.bodyMetrics?.hrv || null
+      hrv: latestData?.sleep?.hrv || null
     };
   };
 
@@ -425,7 +458,7 @@ export default function GarminPage() {
     );
   }
 
-  const { fitnessAge, hrv } = getLatestHealthMetrics();
+  const { hrv } = getLatestHealthMetrics();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -476,28 +509,9 @@ export default function GarminPage() {
 
           {dailyData.length > 0 ? (
             <>
-              {/* 顶部健康指标 - 体能年龄和HRV */}
+              {/* 顶部健康指标 - HRV */}
               <div className="mb-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* 体能年龄 */}
-                  <div className="bg-green-50 p-6 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-green-800 mb-2">体能年龄</h3>
-                        {fitnessAge ? (
-                          <div className="text-3xl font-bold text-green-600">
-                            {fitnessAge} 岁
-                          </div>
-                        ) : (
-                          <div className="text-3xl font-bold text-green-600">暂无数据</div>
-                        )}
-                      </div>
-                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                        <Target className="h-6 w-6 text-green-600" />
-                      </div>
-                    </div>
-                  </div>
-
+                <div className="max-w-md">
                   {/* HRV指标 */}
                   <div className="bg-blue-50 p-6 rounded-lg">
                     <div className="flex items-center justify-between">

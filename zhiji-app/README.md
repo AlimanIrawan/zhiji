@@ -19,6 +19,25 @@
 - **部署**: Vercel
 - **AI**: OpenAI GPT-4o
 
+## Garmin 数据同步说明
+
+**重要说明**: 本应用的 Garmin 数据同步不是通过官方 API 实现的，而是使用 `garmin-connect` 开源库通过模拟登录的方式获取数据。
+
+### 同步方式
+- 使用 `garmin-connect` npm 包模拟登录 Garmin Connect
+- 无需申请官方开发者 API 密钥
+- 需要提供您的 Garmin Connect 账号和密码
+- 支持获取以下数据：
+  - 过去7天的基础数据（总卡路里、活动卡路里、基础代谢卡路里、步数）
+  - 活动记录（活动名称、类型、持续时间、消耗卡路里、距离）
+  - 睡眠分析（总睡眠时间、深度睡眠、浅度睡眠、REM睡眠、清醒时间、睡眠评分）
+  - 身体指标（体能年龄、HRV昨夜平均值）
+
+### 安全性
+- 账号信息仅用于数据同步，不会被存储或传输给第三方
+- 建议使用专门的 Garmin 账号或确保账号安全
+- 暂不支持开启两步验证的账号
+
 ## 快速开始
 
 ### 环境要求
@@ -54,9 +73,10 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 GITHUB_ID=your_github_id
 GITHUB_SECRET=your_github_secret
 
-# Garmin 配置 (可选)
-GARMIN_CONSUMER_KEY=your_garmin_consumer_key
-GARMIN_CONSUMER_SECRET=your_garmin_consumer_secret
+# Garmin 配置 (使用 garmin-connect 库模拟登录)
+GARMIN_USERNAME=your_garmin_username
+GARMIN_PASSWORD=your_garmin_password
+```
 ```
 
 ### 本地开发

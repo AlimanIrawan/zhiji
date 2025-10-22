@@ -263,15 +263,10 @@ export class GarminService {
       await storage.hset(garminKey, {
         userId: data.userId,
         syncDate: data.syncDate,
-        totalCalories: data.totalCalories.toString(),
-        activeCalories: data.activeCalories.toString(),
-        restingCalories: data.restingCalories.toString(),
-        steps: data.steps.toString(),
-        distance: data.distance.toString(),
-        floorsClimbed: (data.floorsClimbed || 0).toString(),
-        heartRate: JSON.stringify(data.heartRate),
+        last7Days: JSON.stringify(data.last7Days),
         activities: JSON.stringify(data.activities),
-        trainingType: data.trainingType,
+        sleep: JSON.stringify(data.sleep),
+        bodyMetrics: JSON.stringify(data.bodyMetrics),
         syncedAt: fullData.syncedAt,
       });
 
@@ -332,6 +327,13 @@ export class GarminService {
   // 获取指定日期的Garmin数据
   static async getGarminData(userId: string, date: string): Promise<GarminData | null> {
     try {
+      // 首先尝试从Blob存储获取
+      const blobData = await this.getGarminDataFromBlob(userId, date);
+      if (blobData) {
+        return blobData;
+      }
+
+      // 如果Blob中没有，从KV存储获取
       const garminKey = `user:${userId}:garmin:${date}`;
       const data = await storage.hgetall(garminKey);
       
@@ -342,15 +344,23 @@ export class GarminService {
       return {
         userId: data.userId as string,
         syncDate: data.syncDate as string,
-        totalCalories: Number(data.totalCalories) || 0,
-        activeCalories: Number(data.activeCalories) || 0,
-        restingCalories: Number(data.restingCalories) || 0,
-        steps: Number(data.steps) || 0,
-        distance: Number(data.distance) || 0,
-        floorsClimbed: Number(data.floorsClimbed) || 0,
-        heartRate: data.heartRate ? JSON.parse(data.heartRate as string) : { resting: 0, max: 0, average: 0 },
+        last7Days: data.last7Days ? JSON.parse(data.last7Days as string) : [],
         activities: data.activities ? JSON.parse(data.activities as string) : [],
-        trainingType: data.trainingType as any || 'none',
+        sleep: data.sleep ? JSON.parse(data.sleep as string) : {
+          totalSleepTime: 0,
+          deepSleep: 0,
+          lightSleep: 0,
+          remSleep: 0,
+          awakeTime: 0,
+          sleepScore: 0
+        },
+        bodyMetrics: data.bodyMetrics ? JSON.parse(data.bodyMetrics as string) : {
+          fitnessAge: 0,
+          hrv: {
+            lastNightAvg: 0,
+            status: 'unknown'
+          }
+        },
         syncedAt: data.syncedAt as string,
       };
     } catch (error) {

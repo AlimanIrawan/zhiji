@@ -1,83 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GarminService } from '@/lib/kv';
-import { garminService } from '@/lib/garmin-service';
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  console.log('[API] Garmin同步请求开始');
+  
   try {
-    console.log('[DEBUG] API: 开始 Garmin 数据同步...');
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const days = searchParams.get('days') || '1';
+    const force = searchParams.get('force') || 'false';
     
-    // 检查是否配置了 Garmin 账号
-    if (!garminService.isConfigured()) {
-      console.error('[ERROR] API: 未配置 Garmin 账号信息');
-      return NextResponse.json({ 
-        error: '未配置 Garmin 账号信息，请在环境变量中设置 GARMIN_EMAIL 和 GARMIN_PASSWORD' 
-      }, { status: 400 });
-    }
-
-    // 从请求中获取日期参数（可选）
-    const body = await request.json().catch(() => ({}));
-    const date = body.date;
-
-    // 使用 Garmin Connect 服务同步数据
-    const garminData = await garminService.syncData(date);
-    console.log('[DEBUG] API: Garmin 数据同步成功:', garminData);
-
-    // 保存到 KV 存储
-    await GarminService.saveGarminData(garminData);
-    console.log('[DEBUG] API: 数据已保存到 KV 存储');
-
-    return NextResponse.json({
-      success: true,
-      data: garminData,
-      message: 'Garmin数据同步成功',
+    console.log('[API] 请求参数 - 日期:', date, '天数:', days, '强制同步:', force);
+    console.log('[API] 准备调用后端服务...');
+    
+    // 调用后端API
+    const backendUrl = `http://localhost:5001/api/garmin/sync?date=${date}&days=${days}&force=${force}`;
+    console.log('[API] 后端URL:', backendUrl);
+    
+    const response = await fetch(backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
-  } catch (error) {
-    console.error('[ERROR] API: Garmin sync error:', error);
+    console.log('[API] 后端响应状态:', response.status, response.statusText);
     
-    // 根据错误类型返回不同的错误信息
-    let errorMessage = 'Garmin数据同步失败';
-    if (error instanceof Error) {
-      if (error.message.includes('登录失败')) {
-        errorMessage = 'Garmin 账号登录失败，请检查账号密码是否正确';
-      } else if (error.message.includes('未配置')) {
-        errorMessage = '未配置 Garmin 账号信息';
-      } else {
-        errorMessage = `同步失败: ${error.message}`;
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[API] 后端错误响应:', errorText);
+      return NextResponse.json(
+        { 
+          error: '后端服务错误', 
+          details: `HTTP ${response.status}: ${response.statusText}`,
+          backendError: errorText
+        }, 
+        { status: response.status }
+      );
     }
 
+    const data = await response.json();
+    console.log('[API] 后端返回数据结构:', Object.keys(data));
+    console.log('[API] 数据获取成功');
+    
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('[API] Garmin同步失败:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    const errorDetails = {
+      message: errorMessage,
+      timestamp: new Date().toISOString(),
+      endpoint: '/api/garmin/sync'
+    };
+    
+    console.error('[API] 错误详情:', errorDetails);
+    
     return NextResponse.json(
-      { error: errorMessage },
+      { 
+        error: 'Garmin数据同步失败', 
+        details: errorDetails
+      }, 
       { status: 500 }
     );
   }
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    // 使用固定的用户ID，因为这是个人应用
-    const userId = 'personal-user';
-
-    const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date');
-    const limit = parseInt(searchParams.get('limit') || '7');
-
-    if (date) {
-      // 获取特定日期的数据
-      const data = await GarminService.getGarminData(userId, date);
-      return NextResponse.json({ success: true, data });
-    } else {
-      // 获取最近的数据
-      const data = await GarminService.getRecentGarminData(userId, limit);
-      return NextResponse.json({ success: true, data });
-    }
-
-  } catch (error) {
-    console.error('Get Garmin data error:', error);
-    return NextResponse.json(
-      { error: '获取Garmin数据失败' },
-      { status: 500 }
-    );
-  }
+export async function POST(request: NextRequest) {
+  return GET(request);
 }

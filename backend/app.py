@@ -32,7 +32,7 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
 # 配置CORS
 frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8000')
-CORS(app, origins=[frontend_url, 'http://localhost:8000', 'http://127.0.0.1:8000'])
+CORS(app, origins=[frontend_url, 'http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost:3000', 'http://127.0.0.1:3000'])
 
 # 初始化服务
 redis_service = RedisService()
@@ -181,59 +181,149 @@ def delete_record(record_id):
 
 # ==================== Garmin数据同步 ====================
 
-@app.route('/api/garmin/sync', methods=['GET'])
+@app.route('/api/garmin/sync', methods=['GET', 'POST'])
 def sync_garmin():
     """
     同步Garmin数据
     智能同步：如果距离上次同步<1小时，返回缓存数据
+    支持获取过去7天的数据
     """
     try:
+        logger.info("[GARMIN SYNC] 开始处理Garmin同步请求")
+        
         user_id = request.args.get('user_id', 'default_user')
         force = request.args.get('force', 'false').lower() == 'true'
+        date = request.args.get('date')
+        days = int(request.args.get('days', '1'))  # 新增：获取天数参数
+        
+        logger.info(f"[GARMIN SYNC] 请求参数 - user_id: {user_id}, force: {force}, date: {date}, days: {days}")
+        
+        # 检查Garmin服务配置
+        if not garmin_service.is_configured():
+            logger.error("[GARMIN SYNC] Garmin服务未配置")
+            return jsonify({
+                'success': False,
+                'error': 'Garmin服务未配置，请检查环境变量GARMIN_EMAIL和GARMIN_PASSWORD'
+            }), 400
+        
+        # 如果请求多天数据
+        if days > 1:
+            logger.info(f"[GARMIN SYNC] 获取过去{days}天的数据")
+            
+            # 生成日期列表
+            from datetime import timedelta
+            end_date = datetime.strptime(date, '%Y-%m-%d') if date else datetime.now()
+            date_list = []
+            
+            for i in range(days):
+                target_date = end_date - timedelta(days=i)
+                date_list.append(target_date.strftime('%Y-%m-%d'))
+            
+            # 获取多天数据
+            multi_day_data = []
+            for target_date in date_list:
+                cache_key = f"{user_id}_{target_date}"
+                
+                # 检查缓存
+                cached_data = redis_service.get_garmin_data(cache_key)
+                if cached_data and not force:
+                    logger.info(f"[GARMIN SYNC] 使用缓存数据: {target_date}")
+                    multi_day_data.append(cached_data)
+                else:
+                    # 同步数据
+                    try:
+                        logger.info(f"[GARMIN SYNC] 同步数据: {target_date}")
+                        garmin_data = garmin_service.sync_data(target_date)
+                        
+                        # 保存到Redis
+                        redis_service.save_garmin_data(cache_key, garmin_data)
+                        redis_service.set_last_sync_time(cache_key, datetime.now().isoformat())
+                        
+                        multi_day_data.append(garmin_data)
+                        
+                        # 更新汇总
+                        update_daily_summary(user_id, target_date, garmin_data)
+                        
+                    except Exception as e:
+                        logger.error(f"[GARMIN SYNC] 同步{target_date}数据失败: {str(e)}")
+                        # 添加空数据占位
+                        empty_data = garmin_service._get_empty_data_structure()
+                        empty_data['syncDate'] = target_date
+                        multi_day_data.append(empty_data)
+            
+            return jsonify({
+                'success': True,
+                'data': multi_day_data,
+                'cached': False,
+                'last_sync': datetime.now().isoformat()
+            })
+        
+        # 单天数据处理（原有逻辑）
+        # 如果指定了日期，使用日期相关的缓存键
+        cache_key = f"{user_id}_{date}" if date else user_id
         
         # 检查上次同步时间
-        last_sync = redis_service.get_last_sync_time(user_id)
+        last_sync = redis_service.get_last_sync_time(cache_key)
         now = datetime.now()
         
+        logger.info(f"[GARMIN SYNC] 缓存键: {cache_key}, 上次同步时间: {last_sync}")
+        
+        # 如果指定了日期且不是今天，直接检查缓存
+        if date and date != now.strftime('%Y-%m-%d'):
+            cached_data = redis_service.get_garmin_data(cache_key)
+            if cached_data:
+                logger.info(f"[GARMIN SYNC] 使用历史日期缓存数据: {date}")
+                return jsonify({
+                    'success': True,
+                    'data': [cached_data],
+                    'cached': True,
+                    'last_sync': last_sync or 'N/A'
+                })
+        
+        # 对于今天的数据，检查同步时间间隔
         if not force and last_sync:
             time_diff = (now - datetime.fromisoformat(last_sync)).total_seconds() / 3600
             if time_diff < 1:  # 小于1小时
-                logger.info(f"使用缓存的Garmin数据 (上次同步: {time_diff:.1f}小时前)")
-                cached_data = redis_service.get_garmin_data(user_id)
+                logger.info(f"[GARMIN SYNC] 使用缓存数据 (上次同步: {time_diff:.1f}小时前)")
+                cached_data = redis_service.get_garmin_data(cache_key)
                 if cached_data:
                     return jsonify({
                         'success': True,
-                        'data': cached_data,
+                        'data': [cached_data],
                         'cached': True,
                         'last_sync': last_sync
                     })
         
         # 执行同步
-        logger.info("开始同步Garmin数据...")
-        garmin_data = garmin_service.sync_data()
+        logger.info("[GARMIN SYNC] 开始从Garmin Connect获取数据...")
+        garmin_data = garmin_service.sync_data(date)
+        logger.info(f"[GARMIN SYNC] 获取到数据字段: {list(garmin_data.keys()) if garmin_data else 'None'}")
         
         # 保存到Redis
-        redis_service.save_garmin_data(user_id, garmin_data)
-        redis_service.set_last_sync_time(user_id, now.isoformat())
+        logger.info("[GARMIN SYNC] 保存数据到Redis...")
+        redis_service.save_garmin_data(cache_key, garmin_data)
+        redis_service.set_last_sync_time(cache_key, now.isoformat())
         
         # 更新今日汇总
         today = datetime.now().strftime('%Y-%m-%d')
+        logger.info(f"[GARMIN SYNC] 更新日期 {today} 的汇总数据...")
         update_daily_summary(user_id, today, garmin_data)
         
-        logger.info("Garmin数据同步完成")
+        logger.info("[GARMIN SYNC] Garmin数据同步完成")
         
         return jsonify({
             'success': True,
-            'data': garmin_data,
+            'data': [garmin_data],
             'cached': False,
             'last_sync': now.isoformat()
         })
         
     except Exception as e:
-        logger.error(f"Garmin同步失败: {str(e)}")
+        logger.error(f"[GARMIN SYNC] 同步失败: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': f'Garmin同步失败: {str(e)}',
+            'error_type': type(e).__name__
         }), 500
 
 @app.route('/api/garmin/test', methods=['GET'])

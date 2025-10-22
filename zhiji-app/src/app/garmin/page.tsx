@@ -6,71 +6,47 @@ import Navigation from '@/components/layout/navigation';
 import { scheduler } from '@/lib/scheduler';
 
 interface GarminData {
-  userId?: string;
+  userId: string;
   syncDate: string;
-  totalCalories: number;
-  activeCalories: number;
-  restingCalories: number;
-  bmrCalories?: number;
-  steps: number;
-  distance?: number;
-  floorsClimbed?: number;
-  heartRate: {
-    resting: number;
-    average: number;
-    max: number;
-    zones?: {
-      zone1: number;
-      zone2: number;
-      zone3: number;
-      zone4: number;
-      zone5: number;
-    };
-  };
-  sleep?: {
-    totalSleepTime: number;
-    totalSleepTimeSeconds: number;
-    deepSleep: number;
-    deepSleepSeconds: number;
-    lightSleep: number;
-    lightSleepSeconds: number;
-    remSleep: number;
-    remSleepSeconds: number;
-    awakeTime: number;
-    awakeTimeSeconds: number;
-    sleepScore: number;
-  };
-  hrv?: {
-    weeklyAvg: number;
-    lastNightAvg: number;
-    lastNight5MinHigh: number;
-    baseline: {
-      lowUpper: number;
-      balancedLower: number;
-      balancedUpper: number;
-    };
-    status: string;
-  };
-  bodyMetrics?: {
-    fitnessAge: number;
-    vo2Max: number;
-    weight: number;
-    bodyFat: number;
-  };
+  
+  // 过去7天基础数据（按天为单位）
+  last7Days: Array<{
+    date: string;
+    totalCalories: number;
+    activeCalories: number;
+    bmrCalories: number; // 基础代谢卡路里
+    steps: number;
+  }>;
+  
+  // 活动记录
   activities: Array<{
-    id?: string;
     name: string;
     type: string;
-    startTime?: string;
-    duration: number;
-    calories: number;
-    distance: number;
+    duration: number; // 持续时间（秒）
+    calories: number; // 消耗卡路里
+    distance: number; // 距离（公里）
   }>;
-  trainingType: 'none' | 'A' | 'S' | 'both';
-  syncedAt?: string;
-  syncTime?: string;
-  isMock?: boolean;
-  hasData?: boolean;
+  
+  // 睡眠分析
+  sleep: {
+    totalSleepTime: number; // 总睡眠时间（分钟）
+    deepSleep: number; // 深度睡眠（分钟）
+    lightSleep: number; // 浅度睡眠（分钟）
+    remSleep: number; // REM睡眠（分钟）
+    awakeTime: number; // 清醒时间（分钟）
+    sleepScore: number; // 睡眠评分
+  };
+  
+  // 身体指标
+  bodyMetrics: {
+    fitnessAge: number; // 体能年龄
+    hrv: {
+      lastNightAvg: number; // 昨夜平均HRV
+      status: string;
+    };
+  };
+  
+  syncedAt: string;
 }
 
 export default function GarminPage() {
@@ -189,32 +165,26 @@ export default function GarminPage() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (dateStr === today.toISOString().split('T')[0]) {
-      return '今天';
-    } else if (dateStr === yesterday.toISOString().split('T')[0]) {
-      return '昨天';
-    } else {
-      return date.toLocaleDateString('zh-CN', { 
-        month: 'long', 
-        day: 'numeric',
-        weekday: 'short'
-      });
+  const getLatestHealthMetrics = () => {
+    if (garminDataList.length === 0) {
+      return { fitnessAge: null, hrv: null };
     }
+    
+    const latestData = garminDataList[0];
+    return {
+      fitnessAge: latestData.bodyMetrics?.fitnessAge || null,
+      hrv: latestData.bodyMetrics?.hrv || null
+    };
   };
 
-  // 获取体能年龄和HRV数据（从最新的数据中获取）
-  const getLatestHealthMetrics = () => {
-    const latestData = garminDataList.find(data => data.hasData && (data.bodyMetrics?.fitnessAge || data.hrv?.weeklyAvg));
-    return {
-      fitnessAge: latestData?.bodyMetrics?.fitnessAge || 0,
-      hrv: latestData?.hrv || null
-    };
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
+    });
   };
 
   if (isLoading) {
@@ -279,25 +249,25 @@ export default function GarminPage() {
 
           {garminDataList.length > 0 ? (
             <>
-              {/* 顶部健康指标 */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-                <div className="flex items-center gap-2 mb-6">
-                  <Heart className="h-6 w-6 text-red-500" />
-                  <h2 className="text-xl font-semibold text-gray-900">核心健康指标</h2>
-                </div>
-                
+              {/* 健康概览 */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">健康概览</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* 体能年龄 */}
-                  <div className="bg-red-50 p-6 rounded-lg">
+                  <div className="bg-green-50 p-6 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-medium text-red-800 mb-2">体能年龄</h3>
-                        <div className="text-3xl font-bold text-red-600">
-                          {fitnessAge > 0 ? `${fitnessAge} 岁` : '暂无数据'}
-                        </div>
+                        <h3 className="font-medium text-green-800 mb-2">体能年龄</h3>
+                        {fitnessAge ? (
+                          <div className="text-2xl font-bold text-green-600">
+                            {fitnessAge} 岁
+                          </div>
+                        ) : (
+                          <div className="text-2xl font-bold text-green-600">暂无数据</div>
+                        )}
                       </div>
-                      <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                        <TrendingUp className="h-6 w-6 text-red-600" />
+                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <Target className="h-6 w-6 text-green-600" />
                       </div>
                     </div>
                   </div>
@@ -307,13 +277,13 @@ export default function GarminPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-medium text-blue-800 mb-2">心率变异性 (HRV)</h3>
-                        {hrv && hrv.weeklyAvg > 0 ? (
+                        {hrv && hrv.lastNightAvg > 0 ? (
                           <div className="space-y-1">
                             <div className="text-2xl font-bold text-blue-600">
-                              {hrv.weeklyAvg} ms
+                              {hrv.lastNightAvg} ms
                             </div>
                             <div className="text-sm text-blue-600">
-                              周平均 • 状态: {hrv.status}
+                              昨夜平均 • 状态: {hrv.status}
                             </div>
                           </div>
                         ) : (
@@ -344,142 +314,95 @@ export default function GarminPage() {
                             {dayData.syncDate}
                           </span>
                         </div>
-                        {dayData.isMock && (
-                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                            模拟数据
-                          </span>
-                        )}
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          已同步
+                        </span>
                       </div>
                     </div>
 
                     <div className="p-6">
-                      {/* 基础数据 */}
-                      <div className="mb-8">
-                        <h4 className="text-md font-medium text-gray-900 mb-4">基础数据</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="bg-orange-50 p-4 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-orange-600">总卡路里</p>
-                                <p className="text-xl font-bold text-orange-700">
-                                  {dayData.totalCalories}
-                                </p>
-                              </div>
-                              <Flame className="h-6 w-6 text-orange-600" />
-                            </div>
-                          </div>
-
-                          <div className="bg-green-50 p-4 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-green-600">步数</p>
-                                <p className="text-xl font-bold text-green-700">
-                                  {dayData.steps.toLocaleString()}
-                                </p>
-                              </div>
-                              <Footprints className="h-6 w-6 text-green-600" />
-                            </div>
-                          </div>
-
-                          <div className="bg-red-50 p-4 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-red-600">平均心率</p>
-                                <p className="text-xl font-bold text-red-700">
-                                  {dayData.heartRate.average || '--'}
-                                </p>
-                              </div>
-                              <Heart className="h-6 w-6 text-red-600" />
-                            </div>
-                          </div>
-
-                          <div className="bg-purple-50 p-4 rounded-lg">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm text-purple-600">训练类型</p>
-                                <p className="text-sm font-bold text-purple-700">
-                                  {getTrainingTypeText(dayData.trainingType)}
-                                </p>
-                              </div>
-                              <Target className="h-6 w-6 text-purple-600" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 活动记录 */}
-                      <div className="mb-8">
-                        <h4 className="text-md font-medium text-gray-900 mb-4">活动记录</h4>
-                        {dayData.activities && dayData.activities.length > 0 ? (
-                          <div className="grid gap-3">
-                            {dayData.activities.map((activity, actIndex) => (
-                              <div key={actIndex} className="bg-gray-50 p-4 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <Activity className="h-5 w-5 text-blue-600" />
-                                    <div>
-                                      <h5 className="font-medium text-gray-900">{activity.name}</h5>
-                                      <p className="text-sm text-gray-600">
-                                        {formatDuration(activity.duration)} • {activity.calories} 卡路里
-                                        {activity.distance > 0 && ` • ${activity.distance.toFixed(2)} 公里`}
-                                      </p>
-                                    </div>
+                      {/* 过去7天数据概览 */}
+                      {dayData.last7Days && dayData.last7Days.length > 0 && (
+                        <div className="mb-8">
+                          <h4 className="text-md font-medium text-gray-900 mb-4">过去7天数据</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {dayData.last7Days.slice(-4).map((day, dayIndex) => (
+                              <div key={day.date} className="bg-gray-50 p-4 rounded-lg">
+                                <div className="text-sm text-gray-600 mb-2">{day.date}</div>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between">
+                                    <span className="text-xs text-gray-500">总卡路里</span>
+                                    <span className="text-sm font-medium">{day.totalCalories}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-xs text-gray-500">步数</span>
+                                    <span className="text-sm font-medium">{day.steps.toLocaleString()}</span>
                                   </div>
                                 </div>
                               </div>
                             ))}
                           </div>
-                        ) : (
-                          <div className="text-center py-6 text-gray-500">
-                            <Activity className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                            <p>今天没有活动记录</p>
+                        </div>
+                      )}
+
+                      {/* 活动记录 */}
+                      {dayData.activities && dayData.activities.length > 0 && (
+                        <div className="mb-8">
+                          <h4 className="text-md font-medium text-gray-900 mb-4">活动记录</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {dayData.activities.map((activity, actIndex) => (
+                              <div key={actIndex} className="bg-purple-50 p-4 rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h5 className="font-medium text-purple-800">{activity.name}</h5>
+                                  <Activity className="h-4 w-4 text-purple-600" />
+                                </div>
+                                <div className="space-y-1 text-sm text-purple-600">
+                                  <div className="flex justify-between">
+                                    <span>类型</span>
+                                    <span>{activity.type}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>时长</span>
+                                    <span>{Math.round(activity.duration / 60)} 分钟</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>卡路里</span>
+                                    <span>{activity.calories}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>距离</span>
+                                    <span>{activity.distance} km</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* 睡眠分析 */}
-                      {dayData.sleep && dayData.sleep.totalSleepTime > 0 && (
-                        <div>
+                      {dayData.sleep && (
+                        <div className="mb-8">
                           <h4 className="text-md font-medium text-gray-900 mb-4">睡眠分析</h4>
-                          <div className="bg-indigo-50 p-4 rounded-lg">
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                <Moon className="h-5 w-5 text-indigo-600" />
-                                <div>
-                                  <h5 className="font-medium text-indigo-800">睡眠质量</h5>
-                                  <p className="text-2xl font-bold text-indigo-700">
-                                    {formatSleepTime(dayData.sleep.totalSleepTime)}
-                                  </p>
+                          <div className="bg-indigo-50 p-6 rounded-lg">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-indigo-600">
+                                  {Math.round(dayData.sleep.totalSleepTime / 60)}h {dayData.sleep.totalSleepTime % 60}m
                                 </div>
+                                <div className="text-sm text-indigo-600">总睡眠</div>
                               </div>
-                              {dayData.sleep.sleepScore > 0 && (
-                                <div className="text-right">
-                                  <p className="text-sm text-indigo-600">睡眠评分</p>
-                                  <p className="text-xl font-bold text-indigo-700">
-                                    {dayData.sleep.sleepScore}/100
-                                  </p>
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-indigo-600">
+                                  {dayData.sleep.sleepScore}
                                 </div>
-                              )}
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <p className="text-indigo-600">深度睡眠</p>
-                                <p className="font-medium text-indigo-800">
-                                  {formatSleepTime(dayData.sleep.deepSleep)}
-                                </p>
+                                <div className="text-sm text-indigo-600">睡眠评分</div>
                               </div>
-                              <div>
-                                <p className="text-indigo-600">浅度睡眠</p>
-                                <p className="font-medium text-indigo-800">
-                                  {formatSleepTime(dayData.sleep.lightSleep)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-indigo-600">REM睡眠</p>
-                                <p className="font-medium text-indigo-800">
-                                  {formatSleepTime(dayData.sleep.remSleep)}
-                                </p>
+                              <div className="text-center">
+                                <div className="text-lg font-bold text-indigo-600">
+                                  {dayData.sleep.deepSleep}m
+                                </div>
+                                <div className="text-sm text-indigo-600">深度睡眠</div>
                               </div>
                             </div>
                           </div>

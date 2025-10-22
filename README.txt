@@ -58,7 +58,7 @@
   - 本地缓存: 浏览器 localStorage
 
 🤖 AI & 集成
-  - OpenAI GPT-4 Vision: 图片营养分析
+  - OpenAI GPT-4o: 图片营养分析
   - Garmin Connect: 运动数据同步
   - 自动化调度: 定时同步任务
 

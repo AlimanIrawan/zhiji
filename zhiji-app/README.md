@@ -17,7 +17,7 @@
 - **认证**: NextAuth.js
 - **数据库**: Vercel KV (Redis)
 - **部署**: Vercel
-- **AI**: OpenAI GPT-4 Vision API
+- **AI**: OpenAI GPT-4o
 
 ## 快速开始
 

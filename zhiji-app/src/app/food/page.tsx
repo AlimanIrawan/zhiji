@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Camera, Upload, Loader2, AlertCircle, CheckCircle, Plus, Trash2, Calendar } from 'lucide-react';
 import Navigation from '@/components/layout/navigation';
 import { FoodRecord } from '@/types';
+import { compressImage, getRecommendedCompressOptions, formatFileSize } from '@/lib/image-utils';
 import { log } from '@/lib/logger';
 import ErrorBoundary from '@/components/error-boundary';
 
@@ -23,9 +24,16 @@ interface AnalysisResult {
   suggestions: string;
 }
 
+// 时间轴数据结构
+interface TimelineDay {
+  date: string;
+  records: FoodRecord[];
+}
+
 export default function FoodPage() {
-  const [records, setRecords] = useState<FoodRecord[]>([]);
+  const [timelineData, setTimelineData] = useState<TimelineDay[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -33,68 +41,108 @@ export default function FoodPage() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [daysLoaded, setDaysLoaded] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     log.info('FoodPage component mounted');
     log.info('FoodPage - Component mount start');
-    loadFoodRecords(selectedDate);
-  }, [selectedDate]);
+    loadInitialTimeline();
+  }, []);
 
-  const loadFoodRecords = async (date?: string) => {
-    const startTime = performance.now();
-    const targetDate = date || new Date().toISOString().split('T')[0];
+  // 加载初始时间轴数据（最近7天）
+  const loadInitialTimeline = async () => {
+    setIsLoading(true);
+    setError(null);
     
     try {
-      log.info('Loading food records', { date: targetDate });
-      log.apiRequest('GET', '/api/food/records', { date: targetDate });
+      const timeline: TimelineDay[] = [];
+      const today = new Date();
       
-      const response = await fetch(`/api/food/records?date=${targetDate}`);
-      const responseTime = performance.now() - startTime;
+      // 加载最近7天的数据
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateString = date.toISOString().split('T')[0];
+        
+        const records = await loadFoodRecordsForDate(dateString);
+        timeline.push({
+          date: dateString,
+          records: records
+        });
+      }
       
-      log.apiResponse('GET', '/api/food/records', response.status, responseTime, {
-        ok: response.ok
-      });
+      setTimelineData(timeline);
+      setDaysLoaded(7);
+      log.info('Initial timeline loaded', { daysLoaded: 7 });
+    } catch (error) {
+      log.error('Failed to load initial timeline', { error });
+      setError('加载时间轴数据失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 加载更多天数的数据
+  const loadMoreDays = async () => {
+    setIsLoadingMore(true);
+    
+    try {
+      const timeline: TimelineDay[] = [...timelineData];
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysLoaded);
+      
+      // 再加载7天的数据
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() - i);
+        const dateString = date.toISOString().split('T')[0];
+        
+        const records = await loadFoodRecordsForDate(dateString);
+        timeline.push({
+          date: dateString,
+          records: records
+        });
+      }
+      
+      setTimelineData(timeline);
+      setDaysLoaded(daysLoaded + 7);
+      log.info('More timeline data loaded', { totalDaysLoaded: daysLoaded + 7 });
+    } catch (error) {
+      log.error('Failed to load more timeline data', { error });
+      setError('加载更多数据失败');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // 为指定日期加载食物记录
+  const loadFoodRecordsForDate = async (date: string): Promise<FoodRecord[]> => {
+    try {
+      log.info('Loading food records for date', { date });
+      log.apiRequest('GET', '/api/food/records', { date });
+      
+      const response = await fetch(`/api/food/records?date=${date}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      log.info('Food records loaded successfully', {
-        recordCount: data.data?.length || 0,
-        success: data.success,
-        date: targetDate
-      });
       
       if (data.success) {
-        setRecords(data.data || []);
-        log.info('FoodPage - Records loaded', {
-          count: data.data?.length || 0,
-          loadTime: `${responseTime.toFixed(2)}ms`,
-          date: targetDate
-        });
+        return data.data || [];
       } else {
         throw new Error(data.error || '获取数据失败');
       }
     } catch (error) {
-      log.error('Failed to load food records', error, {
-        responseTime: `${(performance.now() - startTime).toFixed(2)}ms`,
-        date: targetDate
-      });
-      setError(error instanceof Error ? error.message : '加载失败');
-    } finally {
-      setIsLoading(false);
-      log.info('FoodPage - Loading completed', {
-        totalTime: `${(performance.now() - startTime).toFixed(2)}ms`,
-        date: targetDate
-      });
+      log.error('Error loading food records for date', { error, date });
+      return []; // 返回空数组而不是抛出错误，这样其他日期的数据仍能正常加载
     }
   };
 
-  // 处理图片选择
-  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // 处理图片选择和压缩
+  const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     
     log.userAction('Image file selected', {
@@ -119,17 +167,43 @@ export default function FoodPage() {
         return;
       }
       
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-        log.info('Image preview generated successfully');
-      };
-      reader.onerror = (e) => {
-        log.error('Failed to read image file', e);
-        setError('读取图片失败');
-      };
-      reader.readAsDataURL(file);
+      try {
+        log.info('开始处理图片', { 
+          originalSize: formatFileSize(file.size),
+          fileName: file.name 
+        });
+
+        // 获取推荐的压缩设置
+        const compressOptions = getRecommendedCompressOptions(file);
+        
+        // 压缩图片
+        const compressedFile = await compressImage(file, compressOptions);
+        
+        log.info('图片压缩完成', {
+          originalSize: formatFileSize(file.size),
+          compressedSize: formatFileSize(compressedFile.size),
+          compressionRatio: ((1 - compressedFile.size / file.size) * 100).toFixed(1) + '%'
+        });
+
+        // 设置压缩后的文件
+        setSelectedImage(compressedFile);
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreview(e.target?.result as string);
+          log.info('Image preview generated successfully');
+        };
+        reader.onerror = (e) => {
+          log.error('Failed to read image file', e);
+          setError('读取图片失败');
+        };
+        reader.readAsDataURL(compressedFile);
+        
+        setError(null);
+      } catch (error) {
+        log.error('图片处理失败', { error });
+        setError('图片处理失败，请重试');
+      }
     }
   };
 
@@ -305,7 +379,7 @@ export default function FoodPage() {
       if (response.ok) {
         log.info('Analysis result saved successfully');
         // 重新加载记录
-        await loadFoodRecords();
+        await loadInitialTimeline();
         // 重置表单
         resetForm();
         setShowAddForm(false);
@@ -332,11 +406,7 @@ export default function FoodPage() {
     }
   };
 
-  // 处理日期变化
-  const handleDateChange = (date: string) => {
-    log.userAction('Date changed', { date });
-    setSelectedDate(date);
-  };
+  // 处理日期变化 - 已移除，改为时间轴显示
 
   // 复制记录到分析区域
   const copyRecordToAnalysis = async (record: FoodRecord) => {
@@ -387,8 +457,8 @@ export default function FoodPage() {
 
       if (response.ok) {
         log.info('Record deleted successfully', { recordId });
-        // 重新加载记录
-        await loadFoodRecords(selectedDate);
+        // 重新加载时间轴数据
+        await loadInitialTimeline();
       } else {
         throw new Error('删除失败');
       }
@@ -599,42 +669,42 @@ export default function FoodPage() {
               </div>
             )}
 
-            {/* 历史记录 */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="p-6 border-b border-gray-100">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">历史记录</h2>
-                    <p className="text-gray-600 text-sm mt-1">共 {records.length} 条记录</p>
+            {/* 时间轴记录 */}
+            <div className="space-y-6">
+              {timelineData.map((dayData) => (
+                <div key={dayData.date} className="bg-white rounded-xl shadow-sm border border-gray-100">
+                  <div className="p-6 border-b border-gray-100">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-900">
+                          {dayData.date === new Date().toISOString().split('T')[0] 
+                            ? '今天' 
+                            : new Date(dayData.date).toLocaleDateString('zh-CN', {
+                                month: 'long',
+                                day: 'numeric',
+                                weekday: 'long'
+                              })
+                          }
+                        </h2>
+                        <p className="text-gray-600 text-sm mt-1">
+                          {dayData.records.length} 条记录
+                        </p>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {dayData.date}
+                      </div>
+                    </div>
                   </div>
                   
-                  {/* 日期选择器 */}
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => handleDateChange(e.target.value)}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="divide-y divide-gray-100">
-                {records.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    <Camera className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>
-                      {selectedDate === new Date().toISOString().split('T')[0] 
-                        ? '今天还没有饮食记录' 
-                        : '这一天没有饮食记录'
-                      }
-                    </p>
-                    <p className="text-sm mt-1">点击上方"添加记录"开始记录您的饮食</p>
-                  </div>
-                ) : (
-                  records.map((record) => (
+                  <div className="divide-y divide-gray-100">
+                    {dayData.records.length === 0 ? (
+                      <div className="p-8 text-center text-gray-500">
+                        <Camera className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>这一天没有饮食记录</p>
+                        <p className="text-sm mt-1">点击上方"添加记录"开始记录您的饮食</p>
+                      </div>
+                    ) : (
+                      dayData.records.map((record) => (
                     <div key={record.id} className="p-6 hover:bg-gray-50">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
@@ -717,8 +787,28 @@ export default function FoodPage() {
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+              
+              {/* 加载更多按钮 */}
+              <div className="text-center">
+                <button
+                  onClick={loadMoreDays}
+                  disabled={isLoadingMore}
+                  className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      加载中...
+                    </>
+                  ) : (
+                    '加载更多'
+                  )}
+                </button>
               </div>
             </div>
           </div>

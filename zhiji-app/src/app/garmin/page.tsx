@@ -5,6 +5,30 @@ import { Activity, RefreshCw, Heart, Footprints, Zap, Clock, Target, TrendingUp,
 import Navigation from '@/components/layout/navigation';
 import { scheduler } from '@/lib/scheduler';
 
+// 单日数据接口
+interface DayData {
+  date: string;
+  totalCalories: number;
+  activeCalories: number;
+  bmrCalories: number;
+  steps: number;
+  activities: Array<{
+    name: string;
+    type: string;
+    duration: number; // 持续时间（秒）
+    calories: number;
+    distance: number;
+  }>;
+  sleep: {
+    totalSleepTime: number; // 总睡眠时间（分钟）
+    deepSleep: number;
+    lightSleep: number;
+    remSleep: number;
+    awakeTime: number;
+    sleepScore: number;
+  };
+}
+
 interface GarminData {
   userId: string;
   syncDate: string;
@@ -57,6 +81,7 @@ export default function GarminPage() {
   const [garminDataList, setGarminDataList] = useState<GarminData[]>([]);
   const [isConfigured, setIsConfigured] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [dailyData, setDailyData] = useState<DayData[]>([]);
 
   useEffect(() => {
     console.log('[DEBUG] GarminPage: 组件已挂载');
@@ -84,6 +109,11 @@ export default function GarminPage() {
         setGarminDataList(result.data);
         setIsConfigured(true);
         setLastSyncTime(result.last_sync);
+        
+        // 重新组织数据为按日期的格式
+        const organizedData = organizeDataByDate(result.data);
+        setDailyData(organizedData);
+        
         console.log('[DEBUG] GarminPage: 数据加载成功:', result.data);
       } else {
         console.log('[DEBUG] GarminPage: 暂无数据');
@@ -95,6 +125,45 @@ export default function GarminPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const organizeDataByDate = (rawData: GarminData[]): DayData[] => {
+    // 生成过去7天的日期
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+
+    return dates.map(date => {
+      // 查找该日期的数据
+      const dayDataFromRaw = rawData.find(data => 
+        data.last7Days?.some(day => day.date === date)
+      );
+      
+      const dayInfo = dayDataFromRaw?.last7Days?.find(day => day.date === date);
+      
+      // 查找该日期的活动和睡眠数据（通常在当天的数据中）
+      const todayData = rawData.find(data => data.syncDate === date);
+      
+      return {
+        date,
+        totalCalories: dayInfo?.totalCalories || 0,
+        activeCalories: dayInfo?.activeCalories || 0,
+        bmrCalories: dayInfo?.bmrCalories || 0,
+        steps: dayInfo?.steps || 0,
+        activities: todayData?.activities || [],
+        sleep: todayData?.sleep || {
+          totalSleepTime: 0,
+          deepSleep: 0,
+          lightSleep: 0,
+          remSleep: 0,
+          awakeTime: 0,
+          sleepScore: 0
+        }
+      };
+    });
   };
 
   const handleSync = async () => {
@@ -119,6 +188,11 @@ export default function GarminPage() {
         setSuccess('Garmin 数据同步成功！');
         setIsConfigured(true);
         setLastSyncTime(result.last_sync);
+        
+        // 重新组织数据为按日期的格式
+        const organizedData = organizeDataByDate(result.data);
+        setDailyData(organizedData);
+        
         console.log('[DEBUG] GarminPage: 同步成功:', result.data);
       } else {
         setError(result.error || '同步失败');
@@ -132,20 +206,157 @@ export default function GarminPage() {
     }
   };
 
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.floor(minutes % 60);
-    if (hours > 0) {
-      return `${hours}小时${mins}分钟`;
-    }
-    return `${mins}分钟`;
-  };
+  // 基础数据组件
+  const BasicDataSection = ({ data }: { data: DayData }) => (
+    <div className="mb-6">
+      <h4 className="text-md font-medium text-gray-900 mb-4">基础数据</h4>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-blue-600">
+                {data.totalCalories}
+              </div>
+              <div className="text-sm text-blue-600">总卡路里消耗</div>
+            </div>
+            <Flame className="h-6 w-6 text-blue-600" />
+          </div>
+        </div>
+        
+        <div className="bg-orange-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-orange-600">
+                {data.activeCalories}
+              </div>
+              <div className="text-sm text-orange-600">活动卡路里</div>
+            </div>
+            <Zap className="h-6 w-6 text-orange-600" />
+          </div>
+        </div>
+        
+        <div className="bg-green-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-green-600">
+                {data.bmrCalories}
+              </div>
+              <div className="text-sm text-green-600">基础代谢卡路里</div>
+            </div>
+            <Battery className="h-6 w-6 text-green-600" />
+          </div>
+        </div>
+        
+        <div className="bg-purple-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold text-purple-600">
+                {data.steps.toLocaleString()}
+              </div>
+              <div className="text-sm text-purple-600">步数</div>
+            </div>
+            <Footprints className="h-6 w-6 text-purple-600" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
-  const formatSleepTime = (hours: number) => {
-    const h = Math.floor(hours);
-    const m = Math.floor((hours - h) * 60);
-    return `${h}小时${m}分钟`;
-  };
+  // 活动记录组件
+  const ActivitySection = ({ activities }: { activities: DayData['activities'] }) => (
+    <div className="mb-6">
+      <h4 className="text-md font-medium text-gray-900 mb-4">活动记录</h4>
+      {activities.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {activities.map((activity, index) => (
+            <div key={index} className="bg-indigo-50 p-4 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="font-medium text-indigo-800">{activity.name}</h5>
+                <Activity className="h-4 w-4 text-indigo-600" />
+              </div>
+              <div className="space-y-2 text-sm text-indigo-600">
+                <div className="flex justify-between">
+                  <span>活动类型</span>
+                  <span>{activity.type}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>持续时间</span>
+                  <span>{Math.round(activity.duration / 60)} 分钟</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>消耗卡路里</span>
+                  <span>{activity.calories}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>距离</span>
+                  <span>{activity.distance.toFixed(2)} km</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-gray-50 p-6 rounded-lg text-center">
+          <Activity className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-500">今日暂无活动记录</p>
+        </div>
+      )}
+    </div>
+  );
+
+  // 睡眠分析组件
+  const SleepSection = ({ sleep }: { sleep: DayData['sleep'] }) => (
+    <div className="mb-6">
+      <h4 className="text-md font-medium text-gray-900 mb-4">睡眠分析</h4>
+      {sleep.totalSleepTime > 0 ? (
+        <div className="bg-indigo-50 p-6 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="text-center">
+              <div className="text-xl font-bold text-indigo-600">
+                {Math.floor(sleep.totalSleepTime / 60)}h {sleep.totalSleepTime % 60}m
+              </div>
+              <div className="text-sm text-indigo-600">总睡眠时间</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-indigo-600">
+                {sleep.deepSleep}m
+              </div>
+              <div className="text-sm text-indigo-600">深度睡眠时间</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-indigo-600">
+                {sleep.lightSleep}m
+              </div>
+              <div className="text-sm text-indigo-600">浅度睡眠时间</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-indigo-600">
+                {sleep.remSleep}m
+              </div>
+              <div className="text-sm text-indigo-600">REM睡眠时间</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-indigo-600">
+                {sleep.awakeTime}m
+              </div>
+              <div className="text-sm text-indigo-600">清醒时间</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-indigo-600">
+                {sleep.sleepScore}
+              </div>
+              <div className="text-sm text-indigo-600">睡眠评分</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gray-50 p-6 rounded-lg text-center">
+          <Moon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-gray-500">今日暂无睡眠数据</p>
+        </div>
+      )}
+    </div>
+  );
 
   const getTrainingTypeText = (type: string) => {
     switch (type) {
@@ -179,12 +390,28 @@ export default function GarminPage() {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (dateStr === today.toISOString().split('T')[0]) {
+      return '今天';
+    } else if (dateStr === yesterday.toISOString().split('T')[0]) {
+      return '昨天';
+    } else {
+      return date.toLocaleDateString('zh-CN', {
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
+    }
+  };
+
+  const getDateLabel = (dateStr: string, index: number) => {
+    if (index === 0) return '今天';
+    if (index === 1) return '昨天';
+    if (index === 2) return '前天';
+    return `第${index + 1}天前`;
   };
 
   if (isLoading) {
@@ -247,11 +474,10 @@ export default function GarminPage() {
             </div>
           )}
 
-          {garminDataList.length > 0 ? (
+          {dailyData.length > 0 ? (
             <>
-              {/* 健康概览 */}
+              {/* 顶部健康指标 - 体能年龄和HRV */}
               <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">健康概览</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* 体能年龄 */}
                   <div className="bg-green-50 p-6 rounded-lg">
@@ -259,11 +485,11 @@ export default function GarminPage() {
                       <div>
                         <h3 className="font-medium text-green-800 mb-2">体能年龄</h3>
                         {fitnessAge ? (
-                          <div className="text-2xl font-bold text-green-600">
+                          <div className="text-3xl font-bold text-green-600">
                             {fitnessAge} 岁
                           </div>
                         ) : (
-                          <div className="text-2xl font-bold text-green-600">暂无数据</div>
+                          <div className="text-3xl font-bold text-green-600">暂无数据</div>
                         )}
                       </div>
                       <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -276,18 +502,18 @@ export default function GarminPage() {
                   <div className="bg-blue-50 p-6 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-medium text-blue-800 mb-2">心率变异性 (HRV)</h3>
+                        <h3 className="font-medium text-blue-800 mb-2">HRV 昨晚平均值</h3>
                         {hrv && hrv.lastNightAvg > 0 ? (
                           <div className="space-y-1">
-                            <div className="text-2xl font-bold text-blue-600">
+                            <div className="text-3xl font-bold text-blue-600">
                               {hrv.lastNightAvg} ms
                             </div>
                             <div className="text-sm text-blue-600">
-                              昨夜平均 • 状态: {hrv.status}
+                              状态: {hrv.status}
                             </div>
                           </div>
                         ) : (
-                          <div className="text-2xl font-bold text-blue-600">暂无数据</div>
+                          <div className="text-3xl font-bold text-blue-600">暂无数据</div>
                         )}
                       </div>
                       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -298,116 +524,34 @@ export default function GarminPage() {
                 </div>
               </div>
 
-              {/* 按日期显示数据 */}
-              <div className="space-y-6">
-                {garminDataList.map((dayData, index) => (
-                  <div key={dayData.syncDate} className="bg-white rounded-xl shadow-sm border border-gray-100">
+              {/* 按日期显示7天数据 */}
+              <div className="space-y-8">
+                {dailyData.map((dayData, index) => (
+                  <div key={dayData.date} className="bg-white rounded-xl shadow-sm border border-gray-100">
                     {/* 日期标题 */}
                     <div className="p-6 border-b border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Calendar className="h-5 w-5 text-blue-600" />
-                          <h3 className="text-lg font-semibold text-gray-900">
-                            {formatDate(dayData.syncDate)}
+                          <h3 className="text-xl font-semibold text-gray-900">
+                            {getDateLabel(dayData.date, index)}
                           </h3>
                           <span className="text-sm text-gray-500">
-                            {dayData.syncDate}
+                            {dayData.date}
                           </span>
                         </div>
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          已同步
-                        </span>
                       </div>
                     </div>
 
                     <div className="p-6">
-                      {/* 过去7天数据概览 */}
-                      {dayData.last7Days && dayData.last7Days.length > 0 && (
-                        <div className="mb-8">
-                          <h4 className="text-md font-medium text-gray-900 mb-4">过去7天数据</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {dayData.last7Days.slice(-4).map((day, dayIndex) => (
-                              <div key={day.date} className="bg-gray-50 p-4 rounded-lg">
-                                <div className="text-sm text-gray-600 mb-2">{day.date}</div>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-gray-500">总卡路里</span>
-                                    <span className="text-sm font-medium">{day.totalCalories}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-xs text-gray-500">步数</span>
-                                    <span className="text-sm font-medium">{day.steps.toLocaleString()}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
+                      {/* 基础数据 */}
+                      <BasicDataSection data={dayData} />
+                      
                       {/* 活动记录 */}
-                      {dayData.activities && dayData.activities.length > 0 && (
-                        <div className="mb-8">
-                          <h4 className="text-md font-medium text-gray-900 mb-4">活动记录</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {dayData.activities.map((activity, actIndex) => (
-                              <div key={actIndex} className="bg-purple-50 p-4 rounded-lg">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h5 className="font-medium text-purple-800">{activity.name}</h5>
-                                  <Activity className="h-4 w-4 text-purple-600" />
-                                </div>
-                                <div className="space-y-1 text-sm text-purple-600">
-                                  <div className="flex justify-between">
-                                    <span>类型</span>
-                                    <span>{activity.type}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>时长</span>
-                                    <span>{Math.round(activity.duration / 60)} 分钟</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>卡路里</span>
-                                    <span>{activity.calories}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>距离</span>
-                                    <span>{activity.distance} km</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
+                      <ActivitySection activities={dayData.activities} />
+                      
                       {/* 睡眠分析 */}
-                      {dayData.sleep && (
-                        <div className="mb-8">
-                          <h4 className="text-md font-medium text-gray-900 mb-4">睡眠分析</h4>
-                          <div className="bg-indigo-50 p-6 rounded-lg">
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                              <div className="text-center">
-                                <div className="text-2xl font-bold text-indigo-600">
-                                  {Math.round(dayData.sleep.totalSleepTime / 60)}h {dayData.sleep.totalSleepTime % 60}m
-                                </div>
-                                <div className="text-sm text-indigo-600">总睡眠</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-2xl font-bold text-indigo-600">
-                                  {dayData.sleep.sleepScore}
-                                </div>
-                                <div className="text-sm text-indigo-600">睡眠评分</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-lg font-bold text-indigo-600">
-                                  {dayData.sleep.deepSleep}m
-                                </div>
-                                <div className="text-sm text-indigo-600">深度睡眠</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      <SleepSection sleep={dayData.sleep} />
                     </div>
                   </div>
                 ))}

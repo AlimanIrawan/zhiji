@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Upload, Loader2, AlertCircle, CheckCircle, Plus, Trash2, Calendar } from 'lucide-react';
+import { Camera, Upload, Loader2, AlertCircle, CheckCircle, Plus, Trash2, Calendar, Info } from 'lucide-react';
 import Navigation from '@/components/layout/navigation';
 import { FoodRecord } from '@/types';
 import { compressImage, getRecommendedCompressOptions, formatFileSize } from '@/lib/image-utils';
@@ -42,6 +42,7 @@ export default function FoodPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [daysLoaded, setDaysLoaded] = useState(0);
+  const [showHealthScoreInfo, setShowHealthScoreInfo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -514,9 +515,18 @@ export default function FoodPage() {
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Header */}
             <div className="flex justify-between items-center mb-8">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">饮食记录</h1>
-                <p className="text-gray-600 mt-1">AI智能分析您的饮食营养</p>
+              <div className="flex items-center gap-3">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">饮食记录</h1>
+                  <p className="text-gray-600 mt-1">AI智能分析您的饮食营养</p>
+                </div>
+                <button
+                  onClick={() => setShowHealthScoreInfo(!showHealthScoreInfo)}
+                  className="text-gray-500 hover:text-primary-600 transition-colors"
+                  title="查看健康评分标准"
+                >
+                  <Info className="h-5 w-5" />
+                </button>
               </div>
               <button 
                 onClick={toggleAddForm}
@@ -526,6 +536,20 @@ export default function FoodPage() {
                 {showAddForm ? '取消' : '添加记录'}
               </button>
             </div>
+
+            {/* 健康评分标准说明 */}
+            {showHealthScoreInfo && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h3 className="text-sm font-semibold text-blue-900 mb-2">健康评分标准 (1-100分)</h3>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <div><span className="font-medium">90-100分:</span> 营养均衡，热量适中，富含维生素和矿物质</div>
+                  <div><span className="font-medium">70-89分:</span> 营养较好，但可能某些营养素偏高或偏低</div>
+                  <div><span className="font-medium">50-69分:</span> 营养一般，建议搭配其他食物平衡营养</div>
+                  <div><span className="font-medium">30-49分:</span> 营养不均衡，高热量或缺乏重要营养素</div>
+                  <div><span className="font-medium">1-29分:</span> 营养价值较低，建议减少摄入或改善搭配</div>
+                </div>
+              </div>
+            )}
 
             {/* 添加记录表单 */}
             {showAddForm && (

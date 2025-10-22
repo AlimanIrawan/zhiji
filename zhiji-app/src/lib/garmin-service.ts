@@ -127,51 +127,13 @@ export class GarminService {
       const userProfile = await this.client.getUserProfile();
       console.log('[DEBUG] GarminService: 用户信息:', userProfile?.displayName || '未知用户');
 
-      // 获取活动数据（过去30天）
-      const activities = await this.client.getActivities(0, 30);
-      console.log('[DEBUG] GarminService: 获取活动数据:', activities?.length || 0, '条记录');
-
-      // 获取睡眠数据
-      let sleepData = null;
-      try {
-        sleepData = await this.client.getSleepData(targetDate);
-        console.log('[DEBUG] GarminService: 获取睡眠数据成功');
-      } catch (error) {
-        console.warn('[WARN] GarminService: 获取睡眠数据失败:', error);
+      // 如果请求的是过去7天数据，则获取每一天的数据
+      if (date === 'last7days') {
+        return await this.getLast7DaysData(userProfile);
       }
 
-      // 获取心率数据
-      let heartRateData = null;
-      try {
-        heartRateData = await this.client.getHeartRate(targetDate);
-        console.log('[DEBUG] GarminService: 获取心率数据成功');
-      } catch (error) {
-        console.warn('[WARN] GarminService: 获取心率数据失败:', error);
-      }
-
-      // 获取步数数据
-      let stepsData = null;
-      try {
-        stepsData = await this.client.getSteps(targetDate);
-        console.log('[DEBUG] GarminService: 获取步数数据成功');
-      } catch (error) {
-        console.warn('[WARN] GarminService: 获取步数数据失败:', error);
-      }
-
-      // 获取体重数据
-      let weightData = null;
-      try {
-        weightData = await this.client.getDailyWeightData(targetDate);
-        console.log('[DEBUG] GarminService: 获取体重数据成功');
-      } catch (error) {
-        console.warn('[WARN] GarminService: 获取体重数据失败:', error);
-      }
-
-      // 解析并返回数据
-      const parsedData = this.parseGarminData(activities, dateStr, sleepData, heartRateData, stepsData, weightData, userProfile);
-      
-      console.log('[DEBUG] GarminService: 数据同步完成');
-      return parsedData;
+      // 获取指定日期的单日数据
+      return await this.getSingleDayData(targetDate, dateStr, userProfile);
 
     } catch (error) {
       console.error('[ERROR] GarminService: 数据同步失败:', error);
@@ -180,51 +142,136 @@ export class GarminService {
   }
 
   /**
-   * 解析Garmin数据为标准格式
-   * 注意：由于garmin-connect库API限制，某些数据无法获取，将设为默认值
+   * 获取过去7天的数据
    */
-  private parseGarminData(
-    activities: any[], 
-    dateStr: string, 
-    sleepData?: any, 
-    heartRateData?: any, 
-    stepsData?: any, 
-    weightData?: any, 
-    userProfile?: any
-  ): GarminData {
-    // 生成过去7天的日期数组
+  private async getLast7DaysData(userProfile: any): Promise<GarminData> {
     const last7DaysData = [];
+    
+    // 获取过去7天的数据
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dateString = date.toISOString().split('T')[0];
       
-      // 从活动数据中查找对应日期的数据
-      const dayActivities = activities?.filter(activity => {
-        const activityDate = new Date(activity.startTimeLocal || activity.startTimeGMT);
-        return activityDate.toISOString().split('T')[0] === dateString;
-      }) || [];
-      
-      const totalCalories = dayActivities.reduce((sum, activity) => sum + (activity.calories || 0), 0);
-      const steps = i === 0 ? (typeof stepsData === 'number' ? stepsData : 0) : 0; // 只有今天有步数数据
-      
-      last7DaysData.push({
-        date: dateString,
-        totalCalories: totalCalories || 0,
-        activeCalories: Math.round(totalCalories * 0.7), // 估算活动卡路里
-        bmrCalories: 1800, // 基础代谢估算值
-        steps: steps
-      });
+      try {
+        // 获取该日期的步数数据
+        let stepsData = 0;
+        try {
+          stepsData = await this.client!.getSteps(date) || 0;
+        } catch (error) {
+          console.warn(`[WARN] 获取${dateString}步数数据失败:`, error);
+        }
+
+        // 获取该日期的活动数据（过滤当天的活动）
+        const activities = await this.client!.getActivities(0, 50);
+        const dayActivities = activities?.filter(activity => {
+          const activityDate = new Date(activity.startTimeLocal || activity.startTimeGMT);
+          return activityDate.toISOString().split('T')[0] === dateString;
+        }) || [];
+
+        const totalCalories = dayActivities.reduce((sum, activity) => sum + (activity.calories || 0), 0);
+        
+        last7DaysData.push({
+          date: dateString,
+          totalCalories: totalCalories || 0,
+          activeCalories: Math.round(totalCalories * 0.7), // 估算活动卡路里
+          bmrCalories: 1800, // 基础代谢估算值
+          steps: stepsData
+        });
+      } catch (error) {
+        console.warn(`[WARN] 获取${dateString}数据失败:`, error);
+        // 添加默认数据
+        last7DaysData.push({
+          date: dateString,
+          totalCalories: 0,
+          activeCalories: 0,
+          bmrCalories: 1800,
+          steps: 0
+        });
+      }
     }
 
+    // 获取全局数据（HRV和fitness age）
+    const globalData = await this.getGlobalHealthData();
+
+    return {
+      userId: userProfile?.displayName || 'garmin_user',
+      syncDate: new Date().toISOString().split('T')[0],
+      last7Days: last7DaysData,
+      activities: [], // 过去7天概览不包含具体活动
+      sleep: {
+        totalSleepTime: 0,
+        deepSleep: 0,
+        lightSleep: 0,
+        remSleep: 0,
+        awakeTime: 0,
+        sleepScore: 0
+      },
+      bodyMetrics: globalData,
+      syncedAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 获取单日数据
+   */
+  private async getSingleDayData(targetDate: Date, dateStr: string, userProfile: any): Promise<GarminData> {
+    // 获取指定日期的活动数据
+    const activities = await this.client!.getActivities(0, 50);
+    const dayActivities = activities?.filter(activity => {
+      const activityDate = new Date(activity.startTimeLocal || activity.startTimeGMT);
+      return activityDate.toISOString().split('T')[0] === dateStr;
+    }) || [];
+
+    console.log(`[DEBUG] GarminService: 获取${dateStr}活动数据:`, dayActivities?.length || 0, '条记录');
+
+    // 获取睡眠数据
+    let sleepData = null;
+    try {
+      sleepData = await this.client!.getSleepData(targetDate);
+      console.log('[DEBUG] GarminService: 获取睡眠数据成功:', sleepData);
+    } catch (error) {
+      console.warn('[WARN] GarminService: 获取睡眠数据失败:', error);
+    }
+
+    // 获取步数数据
+    let stepsData = 0;
+    try {
+      stepsData = await this.client!.getSteps(targetDate) || 0;
+      console.log('[DEBUG] GarminService: 获取步数数据成功:', stepsData);
+    } catch (error) {
+      console.warn('[WARN] GarminService: 获取步数数据失败:', error);
+    }
+
+    // 获取全局健康数据
+    const globalData = await this.getGlobalHealthData();
+
+    // 解析并返回数据
+    return this.parseSingleDayData(dayActivities, dateStr, sleepData, stepsData, userProfile, globalData);
+  }
+
+  /**
+   * 解析单日Garmin数据
+   */
+  private parseSingleDayData(
+    activities: any[], 
+    dateStr: string, 
+    sleepData: any, 
+    stepsData: number, 
+    userProfile: any, 
+    globalData: any
+  ): GarminData {
     // 解析活动数据
-    const parsedActivities = (activities || []).slice(0, 10).map(activity => ({
+    const parsedActivities = activities.map(activity => ({
       name: activity.activityName || activity.activityType?.typeKey || '未知活动',
       type: activity.activityType?.typeKey || 'unknown',
       duration: activity.duration || 0,
       calories: activity.calories || 0,
-      distance: (activity.distance || 0) / 1000 // 转换为公里
+      distance: activity.distance || 0
     }));
+
+    // 计算当日总卡路里
+    const totalCalories = activities.reduce((sum, activity) => sum + (activity.calories || 0), 0);
 
     // 解析睡眠数据
     const parsedSleep = {
@@ -233,26 +280,57 @@ export class GarminService {
       lightSleep: sleepData?.lightSleepSeconds ? Math.round(sleepData.lightSleepSeconds / 60) : 0,
       remSleep: sleepData?.remSleepSeconds ? Math.round(sleepData.remSleepSeconds / 60) : 0,
       awakeTime: sleepData?.awakeTimeSeconds ? Math.round(sleepData.awakeTimeSeconds / 60) : 0,
-      sleepScore: sleepData?.sleepScores?.overall?.value || 0
-    };
-
-    // 解析身体指标
-    const parsedBodyMetrics = {
-      fitnessAge: userProfile?.fitnessAge || 25, // 默认值
-      hrv: {
-        lastNightAvg: heartRateData?.restingHeartRate || 0,
-        status: heartRateData ? 'normal' : 'unknown'
-      }
+      sleepScore: sleepData?.sleepScore || 0
     };
 
     return {
       userId: userProfile?.displayName || 'garmin_user',
       syncDate: dateStr,
-      last7Days: last7DaysData,
+      last7Days: [{
+        date: dateStr,
+        totalCalories: totalCalories || 0,
+        activeCalories: Math.round(totalCalories * 0.7), // 估算活动卡路里
+        bmrCalories: 1800, // 基础代谢估算值
+        steps: stepsData
+      }],
       activities: parsedActivities,
       sleep: parsedSleep,
-      bodyMetrics: parsedBodyMetrics,
+      bodyMetrics: globalData,
       syncedAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 获取全局健康数据（HRV和fitness age）
+   */
+  private async getGlobalHealthData(): Promise<any> {
+    let hrvData = null;
+    let fitnessAge = 25; // 默认值
+
+    try {
+      // 获取最新的心率数据（可能包含HRV信息）
+      const heartRateData = await this.client!.getHeartRate();
+      hrvData = heartRateData;
+      console.log('[DEBUG] GarminService: 获取心率/HRV数据成功');
+    } catch (error) {
+      console.warn('[WARN] GarminService: 获取心率/HRV数据失败:', error);
+    }
+
+    try {
+      // 尝试从用户配置中获取fitness age（注意：实际API可能不包含此字段）
+      const userProfile = await this.client!.getUserProfile();
+      // 由于ISocialProfile类型不包含fitnessAge，我们使用默认值
+      console.log('[DEBUG] GarminService: 用户配置信息:', userProfile);
+    } catch (error) {
+      console.warn('[WARN] GarminService: 获取用户配置失败:', error);
+    }
+
+    return {
+      fitnessAge: fitnessAge,
+      hrv: {
+        lastNightAvg: hrvData?.restingHeartRate || 0,
+        status: hrvData ? 'normal' : 'unknown'
+      }
     };
   }
 

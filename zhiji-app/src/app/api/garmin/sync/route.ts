@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { garminService } from '@/lib/garmin-service';
+import { GarminService } from '@/lib/kv';
 
 export async function GET(request: NextRequest) {
   console.log('[API] Garmin同步请求开始');
@@ -6,45 +8,94 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
-    const days = searchParams.get('days') || '1';
-    const force = searchParams.get('force') || 'false';
+    const days = parseInt(searchParams.get('days') || '1');
+    const force = searchParams.get('force') === 'true';
     
     console.log('[API] 请求参数 - 日期:', date, '天数:', days, '强制同步:', force);
-    console.log('[API] 准备调用后端服务...');
     
-    // 调用后端API - 根据环境选择后端地址
-    const backendBaseUrl = process.env.BACKEND_URL || 'http://localhost:5001';
-    const backendUrl = `${backendBaseUrl}/api/garmin/sync?date=${date}&days=${days}&force=${force}`;
-    console.log('[API] 后端URL:', backendUrl);
-    console.log('[API] 环境变量 BACKEND_URL:', process.env.BACKEND_URL);
+    const userId = 'personal-user'; // 个人应用使用固定用户ID
+    const results = [];
     
-    const response = await fetch(backendUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    console.log('[API] 后端响应状态:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[API] 后端错误响应:', errorText);
-      return NextResponse.json(
-        { 
-          error: '后端服务错误', 
-          details: `HTTP ${response.status}: ${response.statusText}`,
-          backendError: errorText
-        }, 
-        { status: response.status }
-      );
+    // 如果是多天同步，处理每一天
+    if (days > 1) {
+      const startDate = new Date(date);
+      
+      for (let i = 0; i < days; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() - i);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        
+        console.log(`[API] 处理日期: ${dateStr}`);
+        
+        // 检查是否已有数据且不强制同步
+        let existingData = null;
+        if (!force) {
+          existingData = await GarminService.getGarminData(userId, dateStr);
+        }
+        
+        if (existingData && !force) {
+          console.log(`[API] 使用已有数据: ${dateStr}`);
+          results.push(existingData);
+        } else {
+          try {
+            // 从Garmin同步新数据
+            console.log(`[API] 从Garmin同步数据: ${dateStr}`);
+            const garminData = await garminService.syncData(dateStr);
+            
+            // 保存到存储
+            const saved = await GarminService.saveGarminData(garminData);
+            if (saved) {
+              results.push(garminData);
+              console.log(`[API] 数据保存成功: ${dateStr}`);
+            } else {
+              console.error(`[API] 数据保存失败: ${dateStr}`);
+            }
+          } catch (syncError) {
+            console.error(`[API] 同步失败 ${dateStr}:`, syncError);
+            // 如果同步失败，尝试获取已有数据
+            const fallbackData = await GarminService.getGarminData(userId, dateStr);
+            if (fallbackData) {
+              results.push(fallbackData);
+            }
+          }
+        }
+      }
+    } else {
+      // 单天同步
+      let existingData = null;
+      if (!force) {
+        existingData = await GarminService.getGarminData(userId, date);
+      }
+      
+      if (existingData && !force) {
+        console.log(`[API] 使用已有数据: ${date}`);
+        results.push(existingData);
+      } else {
+        try {
+          console.log(`[API] 从Garmin同步数据: ${date}`);
+          const garminData = await garminService.syncData(date);
+          
+          const saved = await GarminService.saveGarminData(garminData);
+          if (saved) {
+            results.push(garminData);
+            console.log(`[API] 数据保存成功: ${date}`);
+          }
+        } catch (syncError) {
+          console.error(`[API] 同步失败:`, syncError);
+          throw syncError;
+        }
+      }
     }
-
-    const data = await response.json();
-    console.log('[API] 后端返回数据结构:', Object.keys(data));
-    console.log('[API] 数据获取成功');
     
-    return NextResponse.json(data);
+    console.log(`[API] 同步完成，共获取 ${results.length} 天数据`);
+    
+    return NextResponse.json({
+      success: true,
+      data: results,
+      last_sync: new Date().toISOString(),
+      message: `成功同步 ${results.length} 天数据`
+    });
+    
   } catch (error) {
     console.error('[API] Garmin同步失败:', error);
     
@@ -59,6 +110,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(
       { 
+        success: false,
         error: 'Garmin数据同步失败', 
         details: errorDetails
       }, 

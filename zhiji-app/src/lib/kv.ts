@@ -9,6 +9,7 @@ import {
   ActivityData
 } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
+import { putJson, listByPrefix, getJsonByUrl, deleteByUrl } from '@/lib/blob';
 
 // 用户服务类
 export class UserService {
@@ -103,19 +104,14 @@ export class FoodService {
       const recordId = uuidv4();
       const now = new Date().toISOString();
       const date = record.recordDate;
-      
       const fullRecord: FoodRecord = {
         ...record,
         id: recordId,
         createdAt: now,
         updatedAt: now,
       };
-
-      const recordKey = `user:${record.userId}:foods:${date}`;
-      
-      // 保存记录 - 使用简化的存储方式
-      await storage.hset(recordKey, { [recordId]: JSON.stringify(fullRecord) });
-
+      const pathname = `users/${record.userId}/foods/${date}/${recordId}.json`;
+      await putJson(pathname, fullRecord);
       return recordId;
     } catch (error) {
       console.error('Error saving food record:', error);
@@ -126,57 +122,36 @@ export class FoodService {
   // 获取指定日期的食物记录
   static async getFoodRecords(userId: string, date: string): Promise<FoodRecord[]> {
     try {
-      const recordKey = `user:${userId}:foods:${date}`;
-      const records = await storage.hgetall(recordKey);
-      
-      if (!records || Object.keys(records).length === 0) {
-        return [];
+      const prefix = `users/${userId}/foods/${date}/`;
+      const blobs = await listByPrefix(prefix);
+      const records: FoodRecord[] = [];
+      for (const b of blobs) {
+        const data = await getJsonByUrl(b.url);
+        if (data && typeof data === 'object') {
+          records.push(data as FoodRecord);
+        }
       }
-
-      return Object.values(records)
-        .map(record => {
-          // 检查记录是否已经是对象
-          if (typeof record === 'object' && record !== null) {
-            return record as FoodRecord;
-          }
-          // 如果是字符串，尝试解析JSON
-          if (typeof record === 'string') {
-            try {
-              return JSON.parse(record) as FoodRecord;
-            } catch (parseError) {
-              console.error('Failed to parse record:', record, parseError);
-              return null;
-            }
-          }
-          console.error('Invalid record format:', record);
-          return null;
-        })
-        .filter((record): record is FoodRecord => record !== null)
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      return records.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     } catch (error) {
       console.error('Error getting food records:', error);
       return [];
     }
   }
 
-  // 获取用户最近的食物记录
+  // 获取最近的食物记录
   static async getRecentFoodRecords(userId: string, limit: number = 20): Promise<FoodRecord[]> {
     try {
-      // 简化实现：获取最近几天的记录
+      const prefix = `users/${userId}/foods/`;
+      const blobs = await listByPrefix(prefix);
       const records: FoodRecord[] = [];
-      const today = new Date();
-      
-      for (let i = 0; i < 7 && records.length < limit; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        const dayRecords = await this.getFoodRecords(userId, dateStr);
-        records.push(...dayRecords);
+      for (const b of blobs) {
+        const data = await getJsonByUrl(b.url);
+        if (data && typeof data === 'object') {
+          records.push(data as FoodRecord);
+        }
       }
-
       return records
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
         .slice(0, limit);
     } catch (error) {
       console.error('Error getting recent food records:', error);
@@ -184,40 +159,16 @@ export class FoodService {
     }
   }
 
-  // 获取单个食物记录
   static async getFoodRecord(userId: string, recordId: string): Promise<FoodRecord | null> {
     try {
-      // 简化实现：遍历最近几天查找记录
-      const today = new Date();
-      
-      for (let i = 0; i < 30; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        const recordKey = `user:${userId}:foods:${dateStr}`;
-        const records = await storage.hgetall(recordKey);
-        
-        if (records && records[recordId]) {
-          const record = records[recordId];
-          // 检查记录是否已经是对象
-          if (typeof record === 'object' && record !== null) {
-            return record as FoodRecord;
-          }
-          // 如果是字符串，尝试解析JSON
-          if (typeof record === 'string') {
-            try {
-              return JSON.parse(record) as FoodRecord;
-            } catch (parseError) {
-              console.error('Failed to parse single record:', record, parseError);
-              return null;
-            }
-          }
-          console.error('Invalid single record format:', record);
-          return null;
+      const prefix = `users/${userId}/foods/`;
+      const blobs = await listByPrefix(prefix);
+      for (const b of blobs) {
+        const data = await getJsonByUrl(b.url);
+        if (data && data.id === recordId) {
+          return data as FoodRecord;
         }
       }
-      
       return null;
     } catch (error) {
       console.error('Error getting food record:', error);
@@ -225,78 +176,30 @@ export class FoodService {
     }
   }
 
-  // 更新食物记录
   static async updateFoodRecord(userId: string, recordId: string, updates: Partial<FoodRecord>): Promise<boolean> {
     try {
-      // 简化实现：遍历最近几天查找记录
-      const today = new Date();
-      
-      for (let i = 0; i < 30; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        const recordKey = `user:${userId}:foods:${dateStr}`;
-        const records = await storage.hgetall(recordKey);
-        
-        if (records && records[recordId]) {
-          const existingRecord = records[recordId];
-          let record: FoodRecord;
-          
-          // 检查记录是否已经是对象
-          if (typeof existingRecord === 'object' && existingRecord !== null) {
-            record = existingRecord as FoodRecord;
-          } else if (typeof existingRecord === 'string') {
-            try {
-              record = JSON.parse(existingRecord) as FoodRecord;
-            } catch (parseError) {
-              console.error('Failed to parse record for update:', existingRecord, parseError);
-              return false;
-            }
-          } else {
-            console.error('Invalid record format for update:', existingRecord);
-            return false;
-          }
-          
-          const updatedRecord = {
-            ...record,
-            ...updates,
-            updatedAt: new Date().toISOString(),
-          };
-
-          await storage.hset(recordKey, { [recordId]: JSON.stringify(updatedRecord) });
-          return true;
-        }
-      }
-
-      return false;
+      const existing = await this.getFoodRecord(userId, recordId);
+      if (!existing) return false;
+      const updated: FoodRecord = { ...existing, ...updates, id: recordId, userId, updatedAt: new Date().toISOString() };
+      const pathname = `users/${userId}/foods/${existing.recordDate}/${recordId}.json`;
+      await putJson(pathname, updated);
+      return true;
     } catch (error) {
       console.error('Error updating food record:', error);
       return false;
     }
   }
 
-  // 删除食物记录
   static async deleteFoodRecord(userId: string, recordId: string): Promise<boolean> {
     try {
-      // 简化实现：遍历最近几天查找并删除记录
-      const today = new Date();
-      
-      for (let i = 0; i < 30; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        const recordKey = `user:${userId}:foods:${dateStr}`;
-        const records = await storage.hgetall(recordKey);
-        
-        if (records && records[recordId]) {
-          delete records[recordId];
-          await storage.hset(recordKey, records);
+      const prefix = `users/${userId}/foods/`;
+      const blobs = await listByPrefix(prefix);
+      for (const b of blobs) {
+        if (b.pathname.endsWith(`${recordId}.json`)) {
+          await deleteByUrl(b.url);
           return true;
         }
       }
-
       return false;
     } catch (error) {
       console.error('Error deleting food record:', error);

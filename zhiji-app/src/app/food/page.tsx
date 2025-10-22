@@ -260,6 +260,21 @@ export default function FoodPage() {
     });
 
     try {
+      // 如果选择了图片，先上传到 Blob，得到公开 URL
+      let imageUrl: string | null = null;
+      if (selectedImage) {
+        const fd = new FormData();
+        fd.append('file', selectedImage);
+        const uploadResp = await fetch('/api/upload', { method: 'POST', body: fd });
+        if (uploadResp.ok) {
+          const uploadJson = await uploadResp.json();
+          imageUrl = uploadJson.url || null;
+          log.info('Image uploaded to Blob', { imageUrl });
+        } else {
+          log.warn('Image upload failed, continue saving record without image');
+        }
+      }
+
       const requestData = {
         foodName: description || analysisResult.foodName, // 使用用户描述作为食品名称
         description: description, // 保存用户描述
@@ -268,6 +283,7 @@ export default function FoodPage() {
         healthScore: analysisResult.healthScore,
         suggestions: analysisResult.suggestions,
         recordDate: new Date().toISOString().split('T')[0], // 添加记录日期
+        imageUrl: imageUrl || undefined,
       };
       
       log.apiRequest('POST', '/api/food/records', requestData);
@@ -298,9 +314,7 @@ export default function FoodPage() {
       }
     } catch (error) {
       const responseTime = performance.now() - startTime;
-      log.error('Failed to save analysis result', error, {
-        responseTime: `${responseTime.toFixed(2)}ms`
-      });
+      log.error('Save analysis result failed', error, { responseTime: `${responseTime.toFixed(2)}ms` });
       setError(error instanceof Error ? error.message : '保存失败');
     }
   };

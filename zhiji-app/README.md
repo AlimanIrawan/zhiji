@@ -78,10 +78,10 @@ GITHUB_ID=your_github_id
 GITHUB_SECRET=your_github_secret
 
 # Vercel Blob 存储
-BLOB_READ_WRITE_TOKEN=your_blob_read_write_token
+zhiji_READ_WRITE_TOKEN=your_blob_read_write_token
 
 # Garmin 配置 (使用 garmin-connect 库模拟登录)
-GARMIN_USERNAME=your_garmin_username
+GARMIN_EMAIL=your_garmin_email
 GARMIN_PASSWORD=your_garmin_password
 ```
 ```

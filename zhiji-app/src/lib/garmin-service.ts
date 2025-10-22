@@ -56,7 +56,7 @@ export class GarminService {
   private password: string;
 
   constructor() {
-    this.email = process.env.GARMIN_USERNAME || '';
+    this.email = process.env.GARMIN_EMAIL || '';
     this.password = process.env.GARMIN_PASSWORD || '';
   }
 
@@ -108,7 +108,7 @@ export class GarminService {
   async syncData(date?: string): Promise<GarminData> {
     // 如果未配置Garmin账号，抛出错误
     if (!this.isConfigured()) {
-      throw new Error('未配置 Garmin 账号信息，请在环境变量中设置 GARMIN_USERNAME 和 GARMIN_PASSWORD');
+      throw new Error('未配置 Garmin 账号信息，请在环境变量中设置 GARMIN_EMAIL 和 GARMIN_PASSWORD');
     }
 
     await this.ensureLoggedIn();

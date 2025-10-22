@@ -250,7 +250,7 @@ export class FoodService {
 
 // Garmin数据服务类
 export class GarminService {
-  // 保存Garmin数据
+  // 保存Garmin数据到KV存储和Blob存储
   static async saveGarminData(data: Omit<GarminData, 'syncedAt'>): Promise<boolean> {
     try {
       const garminKey = `user:${data.userId}:garmin:${data.syncDate}`;
@@ -259,6 +259,7 @@ export class GarminService {
         syncedAt: new Date().toISOString(),
       };
 
+      // 保存到KV存储
       await storage.hset(garminKey, {
         userId: data.userId,
         syncDate: data.syncDate,
@@ -274,10 +275,57 @@ export class GarminService {
         syncedAt: fullData.syncedAt,
       });
 
+      // 同时保存到Blob存储（新数据覆盖旧数据）
+      await this.saveGarminDataToBlob(fullData);
+
       return true;
     } catch (error) {
       console.error('Error saving Garmin data:', error);
       return false;
+    }
+  }
+
+  // 保存Garmin数据到Blob存储
+  static async saveGarminDataToBlob(data: GarminData): Promise<boolean> {
+    try {
+      const blobPath = `garmin/${data.userId}/${data.syncDate}.json`;
+      await putJson(blobPath, data);
+      console.log(`[DEBUG] Garmin数据已保存到Blob: ${blobPath}`);
+      return true;
+    } catch (error) {
+      console.error('Error saving Garmin data to blob:', error);
+      return false;
+    }
+  }
+
+  // 批量保存多天Garmin数据到Blob存储
+  static async saveMultipleGarminDataToBlob(dataList: GarminData[]): Promise<boolean> {
+    try {
+      const savePromises = dataList.map(data => this.saveGarminDataToBlob(data));
+      await Promise.all(savePromises);
+      console.log(`[DEBUG] 已批量保存${dataList.length}天的Garmin数据到Blob`);
+      return true;
+    } catch (error) {
+      console.error('Error saving multiple Garmin data to blob:', error);
+      return false;
+    }
+  }
+
+  // 从Blob存储获取Garmin数据
+  static async getGarminDataFromBlob(userId: string, date: string): Promise<GarminData | null> {
+    try {
+      const blobPath = `garmin/${userId}/${date}.json`;
+      const blobs = await listByPrefix(blobPath);
+      
+      if (blobs.length === 0) {
+        return null;
+      }
+
+      const data = await getJsonByUrl(blobs[0].url);
+      return data;
+    } catch (error) {
+      console.error('Error getting Garmin data from blob:', error);
+      return null;
     }
   }
 

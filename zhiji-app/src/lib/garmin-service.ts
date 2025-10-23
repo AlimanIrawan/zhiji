@@ -68,18 +68,15 @@ export class GarminService {
     }
 
     try {
-      // 构建完整的API URL，支持服务器端调用
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      // 使用新的Render后端服务
+      const backendUrl = process.env.GARMIN_BACKEND_URL || 'http://localhost:5001';
       
-      const response = await fetch(`${baseUrl}/api/garmin`, {
+      const response = await fetch(`${backendUrl}/api/garmin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'login',
           email: this.email,
           password: this.password
         })
@@ -87,15 +84,17 @@ export class GarminService {
 
       const result = await response.json();
       
-      if (result.success && result.data.success) {
+      if (result.success) {
         this.isLoggedIn = true;
+        console.log('Garmin登录成功');
         return true;
       } else {
+        this.isLoggedIn = false;
         throw new Error(result.error || '登录失败');
       }
     } catch (error) {
-      console.error('Garmin登录失败:', error);
       this.isLoggedIn = false;
+      console.error('Garmin登录失败:', error);
       throw error;
     }
   }
@@ -124,27 +123,24 @@ export class GarminService {
     try {
       const days = date ? 1 : 7; // 如果指定日期则获取单日，否则获取7天
       
-      // 构建完整的API URL，支持服务器端调用
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      // 使用新的Render后端服务
+      const backendUrl = process.env.GARMIN_BACKEND_URL || 'http://localhost:5001';
       
-      const response = await fetch(`${baseUrl}/api/garmin`, {
+      const response = await fetch(`${backendUrl}/api/garmin/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'sync',
-          days: days,
-          force: false
+          date: date,
+          days: days
         })
       });
 
       const result = await response.json();
       
-      if (result.success && result.data.data) {
-        return this.transformPythonDataToGarminData(result.data.data, date);
+      if (result.success && result.data) {
+        return this.transformPythonDataToGarminData(result.data, date);
       } else {
         throw new Error(result.error || '数据同步失败');
       }
@@ -238,19 +234,14 @@ export class GarminService {
 
       await this.login();
       
-      // 构建完整的API URL，支持服务器端调用
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      // 使用新的Render后端服务
+      const backendUrl = process.env.GARMIN_BACKEND_URL || 'http://localhost:5001';
       
-      const response = await fetch(`${baseUrl}/api/garmin`, {
-        method: 'POST',
+      const response = await fetch(`${backendUrl}/api/garmin/user_info`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'user_info'
-        })
+        }
       });
 
       const result = await response.json();
@@ -259,7 +250,7 @@ export class GarminService {
         return {
           success: true,
           message: 'Garmin Connect连接成功',
-          data: result.data.user_info
+          data: result.data
         };
       } else {
         return {

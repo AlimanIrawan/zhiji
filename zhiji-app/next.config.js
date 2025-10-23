@@ -5,6 +5,8 @@ const nextConfig = {
       allowedOrigins: ['localhost:3000'],
     },
   },
+  // 设置输出文件跟踪根目录
+  outputFileTracingRoot: __dirname,
   // 启用详细日志记录
   logging: {
     fetches: {

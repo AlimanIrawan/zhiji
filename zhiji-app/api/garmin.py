@@ -242,7 +242,46 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(error_response).encode())
 
 # Vercel Serverless Function handler
-handler = Handler
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            # 读取请求体
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            
+            action = data.get('action')
+            
+            if action == 'login':
+                result = handle_login(data)
+            elif action == 'sync':
+                result = handle_sync(data)
+            elif action == 'user_info':
+                result = handle_user_info(data)
+            else:
+                result = {
+                    'success': False,
+                    'error': f'Unknown action: {action}'
+                }
+            
+            # 发送响应
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            
+        except Exception as e:
+            self.send_error_response(500, f'Handler error: {str(e)}')
+    
+    def send_error_response(self, status_code, message):
+        self.send_response(status_code)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        error_response = {
+            'success': False,
+            'error': message
+        }
+        self.wfile.write(json.dumps(error_response).encode())
 
 # 如果作为脚本运行（用于本地开发）
 if __name__ == '__main__':

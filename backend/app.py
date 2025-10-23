@@ -69,27 +69,58 @@ def garmin_login():
         
         logger.info(f"Attempting Garmin login for user: {email}")
         
-        # 创建Garmin连接
+        # 创建新的Garmin客户端实例
         garmin_client = Garmin(email, password)
-        garmin_client.login()
         
-        logger.info("Garmin login successful")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Login successful'
-        })
-        
-    except GarminConnectAuthenticationError as e:
-        logger.error(f"Garmin authentication failed: {e}")
-        return jsonify({
-            'success': False,
-            'error': f'Authentication failed: {str(e)}'
-        }), 401
+        # 尝试登录
+        try:
+            garmin_client.login()
+            logger.info("Garmin login successful")
+            
+            # 验证登录状态
+            try:
+                user_info = garmin_client.get_full_name()
+                logger.info(f"User info retrieved: {user_info}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Login successful',
+                    'user_info': user_info
+                })
+            except Exception as info_error:
+                logger.warning(f"Could not retrieve user info: {info_error}")
+                return jsonify({
+                    'success': True,
+                    'message': 'Login successful (user info unavailable)',
+                    'user_info': None
+                })
+                
+        except Exception as login_error:
+            logger.error(f"Garmin login failed: {login_error}")
+            garmin_client = None
+            
+            # 检查是否是认证错误
+            error_msg = str(login_error).lower()
+            if "authentication" in error_msg or "login" in error_msg or "password" in error_msg:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid email or password'
+                }), 401
+            elif "privacy" in error_msg or "protected" in error_msg:
+                return jsonify({
+                    'success': False,
+                    'error': 'Account privacy protection activated. Please try again later.'
+                }), 429
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'Authentication failed: {str(login_error)}'
+                }), 500
         
     except Exception as e:
         logger.error(f"Garmin login error: {e}")
         logger.error(traceback.format_exc())
+        garmin_client = None
         return jsonify({
             'success': False,
             'error': f'Login error: {str(e)}'
@@ -141,18 +172,31 @@ def garmin_sync():
             try:
                 logger.info(f"Fetching data for {date_str}")
                 
+                # 添加延迟以避免API限制
+                import time
+                time.sleep(1)
+                
                 # 获取每日汇总数据
-                daily_summary = garmin_client.get_stats(date_str)
+                daily_summary = None
+                try:
+                    daily_summary = garmin_client.get_stats(date_str)
+                    logger.info(f"Daily summary fetched for {date_str}")
+                except Exception as stats_error:
+                    logger.warning(f"Could not fetch daily stats for {date_str}: {stats_error}")
                 
                 # 获取活动数据
-                activities = garmin_client.get_activities_by_date(
-                    date_str, date_str
-                )
+                activities = []
+                try:
+                    activities = garmin_client.get_activities_by_date(date_str, date_str)
+                    logger.info(f"Activities fetched for {date_str}: {len(activities) if activities else 0} activities")
+                except Exception as activities_error:
+                    logger.warning(f"Could not fetch activities for {date_str}: {activities_error}")
                 
                 # 获取睡眠数据
                 sleep_data = None
                 try:
                     sleep_data = garmin_client.get_sleep_data(date_str)
+                    logger.info(f"Sleep data fetched for {date_str}")
                 except Exception as sleep_error:
                     logger.warning(f"Could not fetch sleep data for {date_str}: {sleep_error}")
                 
@@ -160,22 +204,31 @@ def garmin_sync():
                 heart_rate_data = None
                 try:
                     heart_rate_data = garmin_client.get_heart_rates(date_str)
+                    logger.info(f"Heart rate data fetched for {date_str}")
                 except Exception as hr_error:
                     logger.warning(f"Could not fetch heart rate data for {date_str}: {hr_error}")
                 
                 day_data = {
                     'date': date_str,
                     'daily_summary': daily_summary,
-                    'activities': activities,
+                    'activities': activities or [],
                     'sleep': sleep_data,
                     'heart_rate': heart_rate_data
                 }
                 
                 result_data.append(day_data)
-                logger.info(f"Successfully fetched data for {date_str}")
+                logger.info(f"Successfully processed data for {date_str}")
                 
             except Exception as e:
                 logger.error(f"Error fetching data for {date_str}: {e}")
+                # 检查是否是认证错误
+                if "privacy" in str(e).lower() or "protected" in str(e).lower():
+                    logger.error("Privacy protection error - may need re-authentication")
+                    return jsonify({
+                        'success': False,
+                        'error': 'Privacy protection error. Please re-login to Garmin Connect.'
+                    }), 401
+                
                 day_data = {
                     'date': date_str,
                     'error': str(e),

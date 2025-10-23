@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { spawn } from 'child_process';
-import path from 'path';
 
 export async function GET() {
   return NextResponse.json({
@@ -16,67 +14,87 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, ...params } = body;
-
-    // 在生产环境中，Python脚本应该通过Vercel的Python运行时执行
+    
+    // 检查是否在生产环境
     const isProduction = process.env.NODE_ENV === 'production';
     
-    let pythonPath: string;
-    let pythonScript: string;
-    
     if (isProduction) {
-      // 生产环境：使用系统Python和相对路径
-      pythonPath = 'python3';
-      pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
+      // 生产环境：转发请求到Python Serverless Function
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'https://zhiji-app.vercel.app';
+      
+      try {
+        const response = await fetch(`${baseUrl}/api/garmin.py`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body)
+        });
+
+        const result = await response.json();
+        return NextResponse.json(result);
+      } catch (fetchError) {
+        console.error('Failed to call Python function:', fetchError);
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to call Python function'
+        }, { status: 500 });
+      }
     } else {
-      // 开发环境：使用虚拟环境
-      pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3');
-      pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
+      // 开发环境：使用spawn调用本地Python脚本
+      const { spawn } = require('child_process');
+      const path = require('path');
+      
+      const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3');
+      const pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
+
+      return new Promise((resolve) => {
+        const python = spawn(pythonPath, [pythonScript], {
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        let output = '';
+        let errorOutput = '';
+
+        python.stdout.on('data', (data: Buffer) => {
+          output += data.toString();
+        });
+
+        python.stderr.on('data', (data: Buffer) => {
+          errorOutput += data.toString();
+        });
+
+        python.on('close', (code: number | null) => {
+          if (code !== 0) {
+            console.error('Python script error:', errorOutput);
+            resolve(NextResponse.json({
+              success: false,
+              error: `Script error: ${errorOutput}`
+            }, { status: 500 }));
+            return;
+          }
+
+          try {
+            const result = JSON.parse(output);
+            resolve(NextResponse.json(result));
+          } catch (parseError) {
+            console.error('JSON parse error:', parseError);
+            console.error('Raw output:', output);
+            resolve(NextResponse.json({
+              success: false,
+              error: 'Failed to parse Python script output'
+            }, { status: 500 }));
+          }
+        });
+
+        // 发送输入数据到Python脚本
+        python.stdin.write(JSON.stringify(body));
+        python.stdin.end();
+      });
     }
 
-    return new Promise((resolve) => {
-      const python = spawn(pythonPath, [pythonScript], {
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-
-      let output = '';
-      let errorOutput = '';
-
-      python.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      python.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-      });
-
-      python.on('close', (code) => {
-        if (code !== 0) {
-          console.error('Python script error:', errorOutput);
-          resolve(NextResponse.json({
-            success: false,
-            error: `Script error: ${errorOutput}`
-          }, { status: 500 }));
-          return;
-        }
-
-        try {
-          const result = JSON.parse(output);
-          resolve(NextResponse.json(result));
-        } catch (parseError) {
-          console.error('JSON parse error:', parseError);
-          console.error('Raw output:', output);
-          resolve(NextResponse.json({
-            success: false,
-            error: 'Failed to parse Python script output'
-          }, { status: 500 }));
-        }
-      });
-
-      // 发送输入数据到Python脚本
-      python.stdin.write(JSON.stringify({ action, ...params }));
-      python.stdin.end();
-    });
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json({

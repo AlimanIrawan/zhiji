@@ -166,15 +166,49 @@ export default function GarminPage() {
     }
 
     return dates.map(date => {
-      // 查找该日期的数据
+      // 查找该日期的基础数据（卡路里、步数等）
       const dayDataFromRaw = rawData.find(data => 
         data.last7Days?.some(day => day.date === date)
       );
       
       const dayInfo = dayDataFromRaw?.last7Days?.find(day => day.date === date);
       
-      // 查找该日期的活动和睡眠数据（通常在当天的数据中）
-      const todayData = rawData.find(data => data.syncDate === date);
+      // 查找该日期的活动和睡眠数据
+      // 修正逻辑：睡眠数据通常在当天或第二天的同步数据中
+      // 我们需要查找包含该日期数据的任何同步记录
+      let activitiesData = [];
+      let sleepData = {
+        totalSleepTime: 0,
+        deepSleep: 0,
+        lightSleep: 0,
+        remSleep: 0,
+        awakeTime: 0,
+        sleepScore: 0,
+        hrv: {
+          lastNightAvg: 0,
+          status: 'unknown'
+        }
+      };
+
+      // 遍历所有原始数据，查找包含目标日期信息的记录
+      for (const data of rawData) {
+        // 检查last7Days中是否包含目标日期
+        const hasTargetDate = data.last7Days?.some(day => day.date === date);
+        
+        if (hasTargetDate) {
+          // 如果这个数据记录包含目标日期，则使用其活动和睡眠数据
+          if (data.activities && data.activities.length > 0) {
+            activitiesData = data.activities;
+          }
+          
+          if (data.sleep && (data.sleep.totalSleepTime > 0 || data.sleep.sleepScore > 0)) {
+            sleepData = data.sleep;
+          }
+          
+          // 找到第一个匹配的就使用，避免重复
+          break;
+        }
+      }
       
       return {
         date,
@@ -182,19 +216,8 @@ export default function GarminPage() {
         activeCalories: dayInfo?.activeCalories || 0,
         bmrCalories: dayInfo?.bmrCalories || 0,
         steps: dayInfo?.steps || 0,
-        activities: todayData?.activities || [],
-        sleep: todayData?.sleep || {
-          totalSleepTime: 0,
-          deepSleep: 0,
-          lightSleep: 0,
-          remSleep: 0,
-          awakeTime: 0,
-          sleepScore: 0,
-          hrv: {
-            lastNightAvg: 0,
-            status: 'unknown'
-          }
-        }
+        activities: activitiesData,
+        sleep: sleepData
       };
     });
   };
@@ -519,35 +542,6 @@ export default function GarminPage() {
 
           {dailyData.length > 0 ? (
             <>
-              {/* 顶部健康指标 - HRV */}
-              <div className="mb-8">
-                <div className="max-w-md">
-                  {/* HRV指标 */}
-                  <div className="bg-blue-50 p-6 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-blue-800 mb-2">HRV 昨晚平均值</h3>
-                        {hrv && hrv.lastNightAvg > 0 ? (
-                          <div className="space-y-1">
-                            <div className="text-3xl font-bold text-blue-600">
-                              {hrv.lastNightAvg} ms
-                            </div>
-                            <div className="text-sm text-blue-600">
-                              状态: {hrv.status}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-3xl font-bold text-blue-600">暂无数据</div>
-                        )}
-                      </div>
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Heart className="h-6 w-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* 按日期显示7天数据 */}
               <div className="space-y-8">
                 {dailyData.map((dayData, index) => (

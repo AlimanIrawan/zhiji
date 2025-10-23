@@ -223,6 +223,23 @@ export class GarminService {
 
     console.log(`[DEBUG] GarminService: 获取${dateStr}活动数据:`, dayActivities?.length || 0, '条记录');
 
+    // 获取每日汇总数据（包含卡路里信息）
+    let dailySummary = null;
+    try {
+      // 尝试获取每日汇总数据
+      dailySummary = await (this.client as any).getDailySummaryChart(targetDate);
+      console.log('[DEBUG] GarminService: 获取每日汇总数据成功:', dailySummary);
+    } catch (error) {
+      console.warn('[WARN] GarminService: 获取每日汇总数据失败，尝试其他方法:', error);
+      // 如果getDailySummaryChart不存在，尝试其他方法
+      try {
+        dailySummary = await (this.client as any).getSteps(targetDate);
+        console.log('[DEBUG] GarminService: 使用步数API获取数据:', dailySummary);
+      } catch (error2) {
+        console.warn('[WARN] GarminService: 所有方法都失败了:', error2);
+      }
+    }
+
     // 获取睡眠数据
     let sleepData = null;
     try {
@@ -242,7 +259,7 @@ export class GarminService {
     }
 
     // 解析数据并返回
-    return this.parseSingleDayData(dayActivities, dateStr, sleepData, stepsData, userProfile);
+    return this.parseSingleDayData(dayActivities, dateStr, sleepData, stepsData, userProfile, dailySummary);
   }
 
   private parseSingleDayData(
@@ -250,11 +267,13 @@ export class GarminService {
     dateStr: string, 
     sleepData: any, 
     stepsData: number, 
-    userProfile: any
+    userProfile: any,
+    dailySummary?: any
   ): GarminData {
     console.log('[DEBUG] parseSingleDayData: 开始解析单日数据', { date: dateStr });
     console.log('[DEBUG] sleepData:', sleepData);
     console.log('[DEBUG] stepsData:', stepsData);
+    console.log('[DEBUG] dailySummary:', dailySummary);
     
     // 解析活动数据
     const parsedActivities = activities.map(activity => ({
@@ -281,12 +300,31 @@ export class GarminService {
 
     console.log('[DEBUG] 解析后的睡眠数据:', parsedSleep);
 
-    // 计算卡路里 - 修复基础数据计算逻辑
-    const activeCalories = parsedActivities.reduce((sum, activity) => sum + activity.calories, 0);
-    const bmrCalories = userProfile?.userData?.bmr || 1800; // 基础代谢
-    const totalCalories = bmrCalories + activeCalories; // 总卡路里 = 基础代谢 + 活动卡路里
+    // 计算卡路里 - 尝试从dailySummary获取，否则使用原有逻辑
+    let totalCalories = 0;
+    let activeCalories = 0;
+    let bmrCalories = 0;
 
-    console.log('[DEBUG] 卡路里计算:', { activeCalories, bmrCalories, totalCalories });
+    if (dailySummary) {
+      // 尝试从每日汇总数据中获取卡路里信息
+      totalCalories = dailySummary.totalKilocalories || dailySummary.totalCalories || 0;
+      activeCalories = dailySummary.activeKilocalories || dailySummary.activeCalories || 0;
+      bmrCalories = dailySummary.bmrKilocalories || dailySummary.restingCalories || dailySummary.bmrCalories || 0;
+      
+      // 如果没有获取到总卡路里，尝试计算
+      if (totalCalories === 0 && (activeCalories > 0 || bmrCalories > 0)) {
+        totalCalories = bmrCalories + activeCalories;
+      }
+    }
+
+    // 如果从dailySummary没有获取到数据，使用原有逻辑
+    if (totalCalories === 0 && activeCalories === 0 && bmrCalories === 0) {
+      activeCalories = parsedActivities.reduce((sum, activity) => sum + activity.calories, 0);
+      bmrCalories = userProfile?.userData?.bmr || 1800; // 基础代谢
+      totalCalories = bmrCalories + activeCalories; // 总卡路里 = 基础代谢 + 活动卡路里
+    }
+
+    console.log('[DEBUG] 卡路里计算:', { totalCalories, activeCalories, bmrCalories, fromDailySummary: !!dailySummary });
 
     return {
       userId: userProfile?.displayName || 'garmin_user',

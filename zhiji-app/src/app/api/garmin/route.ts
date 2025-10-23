@@ -11,7 +11,7 @@ export async function GET() {
   });
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
     
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3');
       const pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
 
-      return new Promise((resolve) => {
+      return new Promise<NextResponse>((resolve) => {
         const python = spawn(pythonPath, [pythonScript], {
           stdio: ['pipe', 'pipe', 'pipe']
         });

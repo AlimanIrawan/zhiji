@@ -176,13 +176,19 @@ export default function GarminPage() {
       // 查找该日期的活动和睡眠数据
       // 修正逻辑：睡眠数据通常在当天或第二天的同步数据中
       // 我们需要查找包含该日期数据的任何同步记录
-      let activitiesData = [];
+      let activitiesData: Array<{
+        name: string;
+        type: string;
+        duration: number;
+        calories: number;
+        distance: number;
+      }> = [];
       let sleepData = {
-        totalSleepTime: 0,
-        deepSleep: 0,
-        lightSleep: 0,
-        remSleep: 0,
-        awakeTime: 0,
+        totalSleepTime: 0 as number | string,
+        deepSleep: 0 as number | string,
+        lightSleep: 0 as number | string,
+        remSleep: 0 as number | string,
+        awakeTime: 0 as number | string,
         sleepScore: 0,
         hrv: {
           lastNightAvg: 0,

@@ -68,7 +68,12 @@ export class GarminService {
     }
 
     try {
-      const response = await fetch('/api/garmin', {
+      // 构建完整的API URL，支持服务器端调用
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/garmin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +124,12 @@ export class GarminService {
     try {
       const days = date ? 1 : 7; // 如果指定日期则获取单日，否则获取7天
       
-      const response = await fetch('/api/garmin', {
+      // 构建完整的API URL，支持服务器端调用
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/garmin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -228,7 +238,12 @@ export class GarminService {
 
       await this.login();
       
-      const response = await fetch('/api/garmin', {
+      // 构建完整的API URL，支持服务器端调用
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/garmin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

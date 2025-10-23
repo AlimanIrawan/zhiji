@@ -31,8 +31,13 @@ class Scheduler {
         try {
           console.log('[DEBUG] Scheduler: 开始执行自动同步');
           
+          // 构建完整的API URL，支持服务器端调用
+          const baseUrl = process.env.VERCEL_URL 
+            ? `https://${process.env.VERCEL_URL}` 
+            : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+          
           // 调用自动同步API
-          const response = await fetch('/api/garmin/auto-sync', {
+          const response = await fetch(`${baseUrl}/api/garmin/auto-sync`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -135,7 +140,12 @@ class Scheduler {
     try {
       console.log('[DEBUG] Scheduler: 手动触发同步');
       
-      const response = await fetch('/api/garmin/auto-sync', {
+      // 构建完整的API URL，支持服务器端调用
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${baseUrl}/api/garmin/auto-sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

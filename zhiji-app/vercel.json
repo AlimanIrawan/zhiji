@@ -1,20 +1,12 @@
 {
-  "functions": {
-    "src/app/api/garmin-python/route.ts": {
-      "runtime": "@vercel/node"
-    }
-  },
   "builds": [
     {
       "src": "package.json",
       "use": "@vercel/next"
     },
     {
-      "src": "../backend/requirements.txt",
+      "src": "api/*.py",
       "use": "@vercel/python"
     }
-  ],
-  "env": {
-    "PYTHONPATH": "../backend"
-  }
+  ]
 }

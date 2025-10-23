@@ -68,7 +68,7 @@ export class GarminService {
     }
 
     try {
-      const response = await fetch('/api/garmin-python', {
+      const response = await fetch('/api/garmin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ export class GarminService {
     try {
       const days = date ? 1 : 7; // 如果指定日期则获取单日，否则获取7天
       
-      const response = await fetch('/api/garmin-python', {
+      const response = await fetch('/api/garmin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -228,7 +228,7 @@ export class GarminService {
 
       await this.login();
       
-      const response = await fetch('/api/garmin-python', {
+      const response = await fetch('/api/garmin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

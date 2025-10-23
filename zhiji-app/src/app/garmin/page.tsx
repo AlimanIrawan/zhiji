@@ -116,8 +116,8 @@ export default function GarminPage() {
 
     loadExistingData();
     
-    // 设置每日自动同步调度器
-    scheduler.setupDailySync();
+    // 注释掉自动同步调度器，只在用户点击刷新按钮时才同步
+    // scheduler.setupDailySync();
     
     // 组件卸载时清理定时器
     return () => {

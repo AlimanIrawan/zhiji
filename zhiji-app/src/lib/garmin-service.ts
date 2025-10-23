@@ -226,18 +226,21 @@ export class GarminService {
     // 获取每日汇总数据（包含卡路里信息）
     let dailySummary = null;
     try {
-      // 尝试获取每日汇总数据
-      dailySummary = await (this.client as any).getDailySummaryChart(targetDate);
-      console.log('[DEBUG] GarminService: 获取每日汇总数据成功:', dailySummary);
+      // 尝试获取步数数据作为每日汇总的一部分
+      const steps = await this.client!.getSteps(targetDate);
+      console.log('[DEBUG] GarminService: 获取步数数据成功:', steps);
+      
+      // 构建基础的每日汇总数据
+      dailySummary = {
+        steps: steps || 0,
+        // 其他数据将从活动中计算得出
+      };
     } catch (error) {
       console.warn('[WARN] GarminService: 获取每日汇总数据失败，尝试其他方法:', error);
-      // 如果getDailySummaryChart不存在，尝试其他方法
-      try {
-        dailySummary = await (this.client as any).getSteps(targetDate);
-        console.log('[DEBUG] GarminService: 使用步数API获取数据:', dailySummary);
-      } catch (error2) {
-        console.warn('[WARN] GarminService: 所有方法都失败了:', error2);
-      }
+      // 如果获取步数失败，设置默认值
+      dailySummary = {
+        steps: 0,
+      };
     }
 
     // 获取睡眠数据
@@ -252,8 +255,9 @@ export class GarminService {
     // 获取步数数据
     let stepsData = 0;
     try {
-      stepsData = await this.client!.getSteps(targetDate) || 0;
-      console.log('[DEBUG] GarminService: 获取步数数据成功:', stepsData);
+      // 步数数据已经在dailySummary中获取了，这里直接使用
+      stepsData = dailySummary?.steps || 0;
+      console.log('[DEBUG] GarminService: 使用步数数据:', stepsData);
     } catch (error) {
       console.warn('[WARN] GarminService: 获取步数数据失败:', error);
     }

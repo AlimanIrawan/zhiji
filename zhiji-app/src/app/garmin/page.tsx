@@ -20,11 +20,11 @@ interface DayData {
     distance: number;
   }>;
   sleep: {
-    totalSleepTime: number; // 总睡眠时间（分钟）
-    deepSleep: number;
-    lightSleep: number;
-    remSleep: number;
-    awakeTime: number;
+    totalSleepTime: number | string; // 总睡眠时间（分钟或格式化字符串）
+    deepSleep: number | string;
+    lightSleep: number | string;
+    remSleep: number | string;
+    awakeTime: number | string;
     sleepScore: number;
     hrv: {
       lastNightAvg: number; // 昨夜平均HRV
@@ -364,36 +364,51 @@ export default function GarminPage() {
   const SleepSection = ({ sleep }: { sleep: DayData['sleep'] }) => (
     <div className="mb-6">
       <h4 className="text-md font-medium text-gray-900 mb-4">睡眠分析</h4>
-      {sleep && sleep.totalSleepTime > 0 ? (
+      {sleep && (sleep.totalSleepTime !== '0小时0分钟' && sleep.totalSleepTime !== 0) ? (
         <div className="bg-indigo-50 p-6 rounded-lg">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
             <div className="text-center">
               <div className="text-xl font-bold text-indigo-600">
-                {Math.floor(sleep.totalSleepTime / 60)}h {sleep.totalSleepTime % 60}m
+                {typeof sleep.totalSleepTime === 'string' 
+                  ? sleep.totalSleepTime 
+                  : `${Math.floor(sleep.totalSleepTime / 60)}h ${sleep.totalSleepTime % 60}m`
+                }
               </div>
               <div className="text-sm text-indigo-600">总睡眠时间</div>
             </div>
             <div className="text-center">
               <div className="text-xl font-bold text-indigo-600">
-                {sleep.deepSleep}m
+                {typeof sleep.deepSleep === 'string' 
+                  ? sleep.deepSleep 
+                  : `${sleep.deepSleep}m`
+                }
               </div>
               <div className="text-sm text-indigo-600">深度睡眠时间</div>
             </div>
             <div className="text-center">
               <div className="text-xl font-bold text-indigo-600">
-                {sleep.lightSleep}m
+                {typeof sleep.lightSleep === 'string' 
+                  ? sleep.lightSleep 
+                  : `${sleep.lightSleep}m`
+                }
               </div>
               <div className="text-sm text-indigo-600">浅度睡眠时间</div>
             </div>
             <div className="text-center">
               <div className="text-xl font-bold text-indigo-600">
-                {sleep.remSleep}m
+                {typeof sleep.remSleep === 'string' 
+                  ? sleep.remSleep 
+                  : `${sleep.remSleep}m`
+                }
               </div>
               <div className="text-sm text-indigo-600">REM睡眠时间</div>
             </div>
             <div className="text-center">
               <div className="text-xl font-bold text-indigo-600">
-                {sleep.awakeTime}m
+                {typeof sleep.awakeTime === 'string' 
+                  ? sleep.awakeTime 
+                  : `${sleep.awakeTime}m`
+                }
               </div>
               <div className="text-sm text-indigo-600">清醒时间</div>
             </div>

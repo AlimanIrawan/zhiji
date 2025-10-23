@@ -262,6 +262,16 @@ export class GarminService {
     return this.parseSingleDayData(dayActivities, dateStr, sleepData, stepsData, userProfile, dailySummary);
   }
 
+  // 辅助函数：将秒数转换为小时分钟格式
+  private formatSecondsToHoursMinutes(seconds: number): string {
+    if (!seconds || seconds === 0) return '0小时0分钟';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    return `${hours}小时${minutes}分钟`;
+  }
+
   private parseSingleDayData(
     activities: any[], 
     dateStr: string, 
@@ -271,9 +281,10 @@ export class GarminService {
     dailySummary?: any
   ): GarminData {
     console.log('[DEBUG] parseSingleDayData: 开始解析单日数据', { date: dateStr });
-    console.log('[DEBUG] sleepData:', sleepData);
+    console.log('[DEBUG] sleepData 原始数据:', JSON.stringify(sleepData, null, 2));
     console.log('[DEBUG] stepsData:', stepsData);
-    console.log('[DEBUG] dailySummary:', dailySummary);
+    console.log('[DEBUG] dailySummary 原始数据:', JSON.stringify(dailySummary, null, 2));
+    console.log('[DEBUG] userProfile 原始数据:', JSON.stringify(userProfile, null, 2));
     
     // 解析活动数据
     const parsedActivities = activities.map(activity => ({
@@ -284,13 +295,21 @@ export class GarminService {
       distance: (activity.distance || 0) / 1000 // 转换为公里
     }));
 
-    // 解析睡眠数据 - 使用正确的字段名
+    // 解析睡眠数据 - 修正字段名和时间格式
+    console.log('[DEBUG] 开始解析睡眠数据...');
+    console.log('[DEBUG] 睡眠相关原始字段:');
+    console.log('  - sleepTimeSeconds:', sleepData?.sleepTimeSeconds);
+    console.log('  - deepSleepSeconds:', sleepData?.deepSleepSeconds);
+    console.log('  - lightSleepSeconds:', sleepData?.lightSleepSeconds);
+    console.log('  - remSleepSeconds:', sleepData?.remSleepSeconds);
+    console.log('  - awakeSleepSeconds:', sleepData?.awakeSleepSeconds);
+    
     const parsedSleep = {
-      totalSleepTime: sleepData?.sleepTimeSeconds ? Math.round(sleepData.sleepTimeSeconds / 60) : 0, // 转换为分钟
-      deepSleep: sleepData?.deepSleepSeconds ? Math.round(sleepData.deepSleepSeconds / 60) : 0,
-      lightSleep: sleepData?.lightSleepSeconds ? Math.round(sleepData.lightSleepSeconds / 60) : 0,
-      remSleep: sleepData?.remSleepSeconds ? Math.round(sleepData.remSleepSeconds / 60) : 0,
-      awakeTime: sleepData?.awakeSleepSeconds ? Math.round(sleepData.awakeSleepSeconds / 60) : 0,
+      totalSleepTime: this.formatSecondsToHoursMinutes(sleepData?.sleepTimeSeconds || 0),
+      deepSleep: this.formatSecondsToHoursMinutes(sleepData?.deepSleepSeconds || 0),
+      lightSleep: this.formatSecondsToHoursMinutes(sleepData?.lightSleepSeconds || 0),
+      remSleep: this.formatSecondsToHoursMinutes(sleepData?.remSleepSeconds || 0),
+      awakeTime: this.formatSecondsToHoursMinutes(sleepData?.awakeSleepSeconds || 0),
       sleepScore: sleepData?.sleepScores?.overall?.value || 0,
       hrv: {
         lastNightAvg: sleepData?.avgOvernightHrv || 0, // 使用正确的字段名
@@ -305,7 +324,18 @@ export class GarminService {
     let activeCalories = 0;
     let bmrCalories = 0;
 
+    // 添加详细的卡路里数据调试日志
+    console.log('[DEBUG] 开始解析卡路里数据...');
     if (dailySummary) {
+      console.log('[DEBUG] dailySummary 中的卡路里相关字段:');
+      console.log('  - totalKilocalories:', dailySummary.totalKilocalories);
+      console.log('  - totalCalories:', dailySummary.totalCalories);
+      console.log('  - activeKilocalories:', dailySummary.activeKilocalories);
+      console.log('  - activeCalories:', dailySummary.activeCalories);
+      console.log('  - bmrKilocalories:', dailySummary.bmrKilocalories);
+      console.log('  - restingCalories:', dailySummary.restingCalories);
+      console.log('  - bmrCalories:', dailySummary.bmrCalories);
+      
       // 尝试从每日汇总数据中获取卡路里信息
       totalCalories = dailySummary.totalKilocalories || dailySummary.totalCalories || 0;
       activeCalories = dailySummary.activeKilocalories || dailySummary.activeCalories || 0;
@@ -315,22 +345,30 @@ export class GarminService {
       if (totalCalories === 0 && (activeCalories > 0 || bmrCalories > 0)) {
         totalCalories = bmrCalories + activeCalories;
       }
+      
+      console.log('[DEBUG] 从 dailySummary 解析的卡路里:', { totalCalories, activeCalories, bmrCalories });
     }
 
     // 如果从dailySummary没有获取到数据，使用原有逻辑
     if (totalCalories === 0 && activeCalories === 0 && bmrCalories === 0) {
+      console.log('[DEBUG] dailySummary 无数据，使用备用逻辑');
       activeCalories = parsedActivities.reduce((sum, activity) => sum + activity.calories, 0);
       bmrCalories = userProfile?.userData?.bmr || 1800; // 基础代谢
       totalCalories = bmrCalories + activeCalories; // 总卡路里 = 基础代谢 + 活动卡路里
+      console.log('[DEBUG] 备用逻辑计算的卡路里:', { totalCalories, activeCalories, bmrCalories });
     }
 
-    console.log('[DEBUG] 卡路里计算:', { totalCalories, activeCalories, bmrCalories, fromDailySummary: !!dailySummary });
+    console.log('[DEBUG] 最终卡路里计算结果:', { totalCalories, activeCalories, bmrCalories, fromDailySummary: !!dailySummary });
+
+    // 使用 calendarDate 作为日期
+    const finalDate = sleepData?.calendarDate || dateStr;
+    console.log('[DEBUG] 使用的日期:', { calendarDate: sleepData?.calendarDate, dateStr, finalDate });
 
     return {
       userId: userProfile?.displayName || 'garmin_user',
-      syncDate: dateStr,
+      syncDate: finalDate,
       last7Days: [{
-        date: dateStr,
+        date: finalDate,
         totalCalories,
         activeCalories,
         bmrCalories,

@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
           try {
             // 从Garmin同步新数据
             console.log(`[API] 从Garmin同步数据: ${dateStr}`);
+            console.log('[DEBUG] API Route: 请求参数:', { days, force, date: dateStr });
             const garminData = await garminService.syncData(dateStr);
+            console.log('[DEBUG] API Route: 同步返回的原始数据:', JSON.stringify(garminData, null, 2));
             
             // 保存到存储
             const saved = await GarminService.saveGarminData(garminData);

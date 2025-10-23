@@ -341,9 +341,9 @@ export default function GarminPage() {
   const SleepSection = ({ sleep }: { sleep: DayData['sleep'] }) => (
     <div className="mb-6">
       <h4 className="text-md font-medium text-gray-900 mb-4">睡眠分析</h4>
-      {sleep.totalSleepTime > 0 ? (
+      {sleep && sleep.totalSleepTime > 0 ? (
         <div className="bg-indigo-50 p-6 rounded-lg">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
             <div className="text-center">
               <div className="text-xl font-bold text-indigo-600">
                 {Math.floor(sleep.totalSleepTime / 60)}h {sleep.totalSleepTime % 60}m
@@ -380,6 +380,17 @@ export default function GarminPage() {
               </div>
               <div className="text-sm text-indigo-600">睡眠评分</div>
             </div>
+            {sleep.hrv && sleep.hrv.lastNightAvg > 0 && (
+              <div className="text-center">
+                <div className="text-xl font-bold text-indigo-600">
+                  {sleep.hrv.lastNightAvg}
+                </div>
+                <div className="text-sm text-indigo-600">昨夜平均HRV</div>
+                <div className="text-xs text-indigo-500 mt-1">
+                  {sleep.hrv.status}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (

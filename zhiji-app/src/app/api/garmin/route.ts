@@ -14,85 +14,54 @@ export async function GET() {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
+    const action = body.action;
     
-    // 检查是否在生产环境
-    const isProduction = process.env.NODE_ENV === 'production';
+    // 后端服务URL - 部署后需要更新为实际的Render URL
+    const backendUrl = process.env.GARMIN_BACKEND_URL || 'http://localhost:5001';
     
-    if (isProduction) {
-      // 生产环境：转发请求到Python Serverless Function
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : 'https://zhiji-app.vercel.app';
-      
-      try {
-        const response = await fetch(`${baseUrl}/api/garmin.py`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body)
-        });
-
-        const result = await response.json();
-        return NextResponse.json(result);
-      } catch (fetchError) {
-        console.error('Failed to call Python function:', fetchError);
+    // 根据action确定具体的端点
+    let endpoint = '';
+    switch (action) {
+      case 'login':
+        endpoint = '/api/garmin/login';
+        break;
+      case 'sync':
+        endpoint = '/api/garmin/sync';
+        break;
+      case 'user_info':
+        endpoint = '/api/garmin/user-info';
+        break;
+      default:
         return NextResponse.json({
           success: false,
-          error: 'Failed to call Python function'
-        }, { status: 500 });
-      }
-    } else {
-      // 开发环境：使用spawn调用本地Python脚本
-      const { spawn } = require('child_process');
-      const path = require('path');
+          error: 'Invalid action'
+        }, { status: 400 });
+    }
+    
+    try {
+      console.log(`Forwarding request to: ${backendUrl}${endpoint}`);
       
-      const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3');
-      const pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
-
-      return new Promise<NextResponse>((resolve) => {
-        const python = spawn(pythonPath, [pythonScript], {
-          stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        let output = '';
-        let errorOutput = '';
-
-        python.stdout.on('data', (data: Buffer) => {
-          output += data.toString();
-        });
-
-        python.stderr.on('data', (data: Buffer) => {
-          errorOutput += data.toString();
-        });
-
-        python.on('close', (code: number | null) => {
-          if (code !== 0) {
-            console.error('Python script error:', errorOutput);
-            resolve(NextResponse.json({
-              success: false,
-              error: `Script error: ${errorOutput}`
-            }, { status: 500 }));
-            return;
-          }
-
-          try {
-            const result = JSON.parse(output);
-            resolve(NextResponse.json(result));
-          } catch (parseError) {
-            console.error('JSON parse error:', parseError);
-            console.error('Raw output:', output);
-            resolve(NextResponse.json({
-              success: false,
-              error: 'Failed to parse Python script output'
-            }, { status: 500 }));
-          }
-        });
-
-        // 发送输入数据到Python脚本
-        python.stdin.write(JSON.stringify(body));
-        python.stdin.end();
+      const response = await fetch(`${backendUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body)
       });
+
+      if (!response.ok) {
+        throw new Error(`Backend responded with status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return NextResponse.json(result);
+      
+    } catch (fetchError: any) {
+      console.error('Failed to call backend service:', fetchError);
+      return NextResponse.json({
+        success: false,
+        error: `Failed to call backend service: ${fetchError.message}`
+      }, { status: 500 });
     }
 
   } catch (error) {

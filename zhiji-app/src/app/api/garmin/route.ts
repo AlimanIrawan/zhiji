@@ -13,14 +13,14 @@ export async function GET() {
   });
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json();
     
     // 调用Python脚本
     const pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
     
-    return new Promise((resolve, reject) => {
+    return new Promise<NextResponse>((resolve, reject) => {
       const python = spawn('python3', [pythonScript], {
         stdio: ['pipe', 'pipe', 'pipe']
       });

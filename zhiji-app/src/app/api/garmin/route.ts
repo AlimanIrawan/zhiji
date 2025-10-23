@@ -19,9 +19,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     
     // 调用Python脚本
     const pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
+    const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3');
     
     return new Promise<NextResponse>((resolve, reject) => {
-      const python = spawn('python3', [pythonScript], {
+      const python = spawn(pythonPath, [pythonScript], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
       

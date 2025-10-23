@@ -25,11 +25,11 @@ export interface GarminData {
   
   // 当日睡眠数据
   sleep: {
-    totalSleepTime: number; // 总睡眠时间（分钟）
-    deepSleep: number; // 深度睡眠（分钟）
-    lightSleep: number; // 浅度睡眠（分钟）
-    remSleep: number; // REM睡眠（分钟）
-    awakeTime: number; // 清醒时间（分钟）
+    totalSleepTime: number | string; // 总睡眠时间（分钟或格式化字符串）
+    deepSleep: number | string; // 深度睡眠（分钟或格式化字符串）
+    lightSleep: number | string; // 浅度睡眠（分钟或格式化字符串）
+    remSleep: number | string; // REM睡眠（分钟或格式化字符串）
+    awakeTime: number | string; // 清醒时间（分钟或格式化字符串）
     sleepScore: number; // 睡眠评分
     hrv: {
       lastNightAvg: number; // 昨夜平均HRV

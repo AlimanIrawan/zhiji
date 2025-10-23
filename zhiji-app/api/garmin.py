@@ -7,58 +7,36 @@ Garmin Connect API for Vercel Serverless Functions
 
 import json
 import os
-import sys
 from datetime import datetime, timedelta
 import traceback
+from http.server import BaseHTTPRequestHandler
+import urllib.parse
 
 try:
     from garminconnect import Garmin, GarminConnectConnectionError, GarminConnectTooManyRequestsError, GarminConnectAuthenticationError
-except ImportError:
-    # 如果导入失败，返回错误信息
-    def handler(request):
-        return {
-            'statusCode': 500,
-            'body': json.dumps({
+except ImportError as e:
+    # 如果导入失败，创建一个错误处理器
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            error_response = {
                 'success': False,
-                'error': 'garminconnect library not installed'
-            })
-        }
-
-def main():
-    """主函数，处理来自stdin的JSON请求"""
-    try:
-        # 从stdin读取请求数据
-        input_data = sys.stdin.read()
-        if not input_data:
-            print(json.dumps({
-                'success': False,
-                'error': 'No input data provided'
-            }))
-            return
-            
-        request_data = json.loads(input_data)
-        action = request_data.get('action')
-        
-        if action == 'login':
-            result = handle_login(request_data)
-        elif action == 'sync':
-            result = handle_sync(request_data)
-        elif action == 'user_info':
-            result = handle_user_info(request_data)
-        else:
-            result = {
-                'success': False,
-                'error': f'Unknown action: {action}'
+                'error': f'garminconnect library not installed: {str(e)}'
             }
-            
-        print(json.dumps(result))
-        
-    except Exception as e:
+            self.wfile.write(json.dumps(error_response).encode())
+    
+    # 导出handler供Vercel使用
+    handler = Handler
+    
+    # 如果作为脚本运行，也要处理
+    if __name__ == '__main__':
         print(json.dumps({
             'success': False,
-            'error': f'Script error: {str(e)}',
-            'traceback': traceback.format_exc()
+            'error': f'garminconnect library not installed: {str(e)}'
         }))
+        exit(1)
 
 def handle_login(data):
     """处理登录请求"""
@@ -72,9 +50,9 @@ def handle_login(data):
                 'error': 'Email and password are required'
             }
         
-        # 创建Garmin客户端并登录
-        garmin_client = Garmin(email, password)
-        garmin_client.login()
+        # 创建Garmin连接
+        garmin = Garmin(email, password)
+        garmin.login()
         
         return {
             'success': True,
@@ -83,7 +61,6 @@ def handle_login(data):
                 'message': 'Login successful'
             }
         }
-        
     except GarminConnectAuthenticationError as e:
         return {
             'success': False,
@@ -98,83 +75,77 @@ def handle_login(data):
 def handle_sync(data):
     """处理数据同步请求"""
     try:
-        # 使用环境变量中的凭据
-        email = os.getenv('GARMIN_EMAIL')
-        password = os.getenv('GARMIN_PASSWORD')
+        email = data.get('email')
+        password = data.get('password')
+        target_date = data.get('date')
         
         if not email or not password:
             return {
                 'success': False,
-                'error': 'Garmin credentials not configured in environment variables'
+                'error': 'Email and password are required'
             }
         
-        # 创建Garmin客户端并登录
-        garmin_client = Garmin(email, password)
-        garmin_client.login()
+        # 创建Garmin连接
+        garmin = Garmin(email, password)
+        garmin.login()
         
-        days = data.get('days', 7)
+        # 设置目标日期
+        if target_date:
+            try:
+                date_obj = datetime.strptime(target_date, '%Y-%m-%d')
+            except ValueError:
+                return {
+                    'success': False,
+                    'error': 'Invalid date format. Use YYYY-MM-DD'
+                }
+        else:
+            date_obj = datetime.now()
         
         # 获取数据
-        sync_data = {}
+        result_data = []
         
-        # 获取最近几天的数据
-        for i in range(days):
-            date = datetime.now() - timedelta(days=i)
-            date_str = date.strftime('%Y-%m-%d')
+        # 获取过去7天的数据
+        for i in range(7):
+            current_date = date_obj - timedelta(days=i)
+            date_str = current_date.strftime('%Y-%m-%d')
             
             try:
-                # 获取当日数据
-                daily_data = {
-                    'date': date_str,
-                    'steps': 0,
-                    'calories': 0,
-                    'distance': 0,
-                    'sleep': None,
-                    'activities': []
-                }
-                
-                # 获取步数等基础数据
-                try:
-                    steps_data = garmin_client.get_steps_data(date_str)
-                    if steps_data:
-                        daily_data['steps'] = steps_data.get('totalSteps', 0)
-                except:
-                    pass
-                
-                # 获取睡眠数据
-                try:
-                    sleep_data = garmin_client.get_sleep_data(date_str)
-                    if sleep_data:
-                        daily_data['sleep'] = {
-                            'totalSleepTimeSeconds': sleep_data.get('totalSleepTimeSeconds', 0),
-                            'deepSleepSeconds': sleep_data.get('deepSleepSeconds', 0),
-                            'lightSleepSeconds': sleep_data.get('lightSleepSeconds', 0),
-                            'remSleepSeconds': sleep_data.get('remSleepSeconds', 0),
-                            'awakeSleepSeconds': sleep_data.get('awakeSleepSeconds', 0)
-                        }
-                except:
-                    pass
+                # 获取每日汇总数据
+                daily_summary = garmin.get_daily_summary(current_date.strftime('%Y-%m-%d'))
                 
                 # 获取活动数据
-                try:
-                    activities = garmin_client.get_activities_by_date(date_str, date_str)
-                    if activities:
-                        daily_data['activities'] = activities[:5]  # 限制返回前5个活动
-                except:
-                    pass
+                activities = garmin.get_activities_by_date(current_date.strftime('%Y-%m-%d'))
                 
-                sync_data[date_str] = daily_data
+                # 获取睡眠数据
+                sleep_data = None
+                try:
+                    sleep_data = garmin.get_sleep_data(current_date.strftime('%Y-%m-%d'))
+                except:
+                    pass  # 睡眠数据可能不存在
+                
+                day_data = {
+                    'date': date_str,
+                    'daily_summary': daily_summary,
+                    'activities': activities,
+                    'sleep': sleep_data
+                }
+                
+                result_data.append(day_data)
                 
             except Exception as e:
-                print(f"Error getting data for {date_str}: {str(e)}", file=sys.stderr)
-                continue
+                # 如果某一天的数据获取失败，继续获取其他天的数据
+                day_data = {
+                    'date': date_str,
+                    'error': str(e),
+                    'daily_summary': None,
+                    'activities': [],
+                    'sleep': None
+                }
+                result_data.append(day_data)
         
         return {
             'success': True,
-            'data': {
-                'data': sync_data,
-                'message': f'Successfully synced {len(sync_data)} days of data'
-            }
+            'data': result_data
         }
         
     except GarminConnectAuthenticationError as e:
@@ -191,29 +162,25 @@ def handle_sync(data):
 def handle_user_info(data):
     """处理用户信息请求"""
     try:
-        # 使用环境变量中的凭据
-        email = os.getenv('GARMIN_EMAIL')
-        password = os.getenv('GARMIN_PASSWORD')
+        email = data.get('email')
+        password = data.get('password')
         
         if not email or not password:
             return {
                 'success': False,
-                'error': 'Garmin credentials not configured in environment variables'
+                'error': 'Email and password are required'
             }
         
-        # 创建Garmin客户端并登录
-        garmin_client = Garmin(email, password)
-        garmin_client.login()
+        # 创建Garmin连接
+        garmin = Garmin(email, password)
+        garmin.login()
         
         # 获取用户信息
-        user_profile = garmin_client.get_user_profile()
+        user_profile = garmin.get_user_profile()
         
         return {
             'success': True,
-            'data': {
-                'user_info': user_profile,
-                'message': 'User info retrieved successfully'
-            }
+            'data': user_profile
         }
         
     except GarminConnectAuthenticationError as e:
@@ -227,5 +194,85 @@ def handle_user_info(data):
             'error': f'User info error: {str(e)}'
         }
 
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            # 读取请求体
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            # 解析JSON数据
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+            except json.JSONDecodeError:
+                self.send_error_response(400, 'Invalid JSON')
+                return
+            
+            action = data.get('action')
+            
+            if action == 'login':
+                result = handle_login(data)
+            elif action == 'sync':
+                result = handle_sync(data)
+            elif action == 'user_info':
+                result = handle_user_info(data)
+            else:
+                result = {
+                    'success': False,
+                    'error': f'Unknown action: {action}'
+                }
+            
+            # 发送响应
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            
+        except Exception as e:
+            self.send_error_response(500, f'Server error: {str(e)}')
+    
+    def send_error_response(self, status_code, message):
+        self.send_response(status_code)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        error_response = {
+            'success': False,
+            'error': message
+        }
+        self.wfile.write(json.dumps(error_response).encode())
+
+# Vercel Serverless Function handler
+handler = Handler
+
+# 如果作为脚本运行（用于本地开发）
 if __name__ == '__main__':
-    main()
+    import sys
+    
+    try:
+        # 从stdin读取请求数据
+        input_data = sys.stdin.read()
+        data = json.loads(input_data)
+        
+        action = data.get('action')
+        
+        if action == 'login':
+            result = handle_login(data)
+        elif action == 'sync':
+            result = handle_sync(data)
+        elif action == 'user_info':
+            result = handle_user_info(data)
+        else:
+            result = {
+                'success': False,
+                'error': f'Unknown action: {action}'
+            }
+        
+        print(json.dumps(result))
+        
+    except Exception as e:
+        error_result = {
+            'success': False,
+            'error': f'Script error: {str(e)}',
+            'traceback': traceback.format_exc()
+        }
+        print(json.dumps(error_result))

@@ -13,71 +13,75 @@ export async function GET() {
   });
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const { action, ...params } = body;
+
+    // 在生产环境中，Python脚本应该通过Vercel的Python运行时执行
+    const isProduction = process.env.NODE_ENV === 'production';
     
-    // 调用Python脚本
-    const pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
-    const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3');
+    let pythonPath: string;
+    let pythonScript: string;
     
-    return new Promise<NextResponse>((resolve, reject) => {
+    if (isProduction) {
+      // 生产环境：使用系统Python和相对路径
+      pythonPath = 'python3';
+      pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
+    } else {
+      // 开发环境：使用虚拟环境
+      pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3');
+      pythonScript = path.join(process.cwd(), 'api', 'garmin.py');
+    }
+
+    return new Promise((resolve) => {
       const python = spawn(pythonPath, [pythonScript], {
         stdio: ['pipe', 'pipe', 'pipe']
       });
-      
-      let stdout = '';
-      let stderr = '';
-      
+
+      let output = '';
+      let errorOutput = '';
+
       python.stdout.on('data', (data) => {
-        stdout += data.toString();
+        output += data.toString();
       });
-      
+
       python.stderr.on('data', (data) => {
-        stderr += data.toString();
+        errorOutput += data.toString();
       });
-      
+
       python.on('close', (code) => {
         if (code !== 0) {
-          console.error('Python script error:', stderr);
+          console.error('Python script error:', errorOutput);
           resolve(NextResponse.json({
             success: false,
-            error: `Python script failed with code ${code}: ${stderr}`
+            error: `Script error: ${errorOutput}`
           }, { status: 500 }));
           return;
         }
-        
+
         try {
-          const result = JSON.parse(stdout);
+          const result = JSON.parse(output);
           resolve(NextResponse.json(result));
         } catch (parseError) {
-          console.error('Failed to parse Python output:', stdout);
+          console.error('JSON parse error:', parseError);
+          console.error('Raw output:', output);
           resolve(NextResponse.json({
             success: false,
             error: 'Failed to parse Python script output'
           }, { status: 500 }));
         }
       });
-      
-      // 发送请求数据到Python脚本
-      python.stdin.write(JSON.stringify(body));
+
+      // 发送输入数据到Python脚本
+      python.stdin.write(JSON.stringify({ action, ...params }));
       python.stdin.end();
-      
-      // 设置超时
-      setTimeout(() => {
-        python.kill();
-        resolve(NextResponse.json({
-          success: false,
-          error: 'Request timeout'
-        }, { status: 408 }));
-      }, 30000); // 30秒超时
     });
-    
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('API error:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Internal server error'
     }, { status: 500 });
   }
 }

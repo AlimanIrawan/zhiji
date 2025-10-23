@@ -21,21 +21,65 @@
 
 ## Garmin 数据同步说明
 
-**重要说明**: 本应用的 Garmin 数据同步不是通过官方 API 实现的，而是使用 `garmin-connect` 开源库通过模拟登录的方式获取数据。
+**重要说明**: 本应用的 Garmin 数据同步不是通过官方 API 实现的，而是使用开源库通过模拟登录的方式获取数据。
 
-### 同步方式
-- 使用 `garmin-connect` npm 包模拟登录 Garmin Connect
-- 无需申请官方开发者 API 密钥
-- 需要提供您的 Garmin Connect 账号和密码
+### 库迁移说明
 
-### 支持的数据类型
-由于 `garmin-connect` 库的 API 限制，目前支持获取以下数据：
-- ✅ **活动记录**: 活动名称、类型、持续时间、消耗卡路里、距离
-- ✅ **基础数据**: 通过活动记录汇总计算每日卡路里和步数
-- ⚠️ **睡眠分析**: 暂时无法获取（API限制）
-- ⚠️ **身体指标**: 暂时无法获取体能年龄和HRV数据（API限制）
+项目已从JavaScript `garmin-connect` 库迁移到Python `python-garminconnect` 库，以解决数据获取不完整的问题。
 
-**注意**: 由于使用的是第三方开源库，某些高级数据（如睡眠分析、HRV、体能年龄等）可能无法获取。这些数据在界面中会显示为默认值或不可用状态。
+#### 迁移原因
+- JavaScript `garmin-connect` 库无法获取完整的睡眠数据和每日汇总数据
+- 睡眠相关字段（deepSleepSeconds, lightSleepSeconds等）返回undefined
+- dailySummary缺少原始数据，只能获取基础步数信息
+
+#### 新库功能
+Python `python-garminconnect` 库提供更完整的数据访问：
+- 完整的睡眠数据（深度睡眠、浅度睡眠、REM睡眠等）
+- 详细的每日汇总数据（卡路里、活动数据等）
+- 更稳定的API接口
+- 更好的错误处理
+
+#### 支持的数据类型
+- 用户资料信息
+- 每日活动数据
+- 睡眠详细数据
+- 步数和距离数据
+- 心率数据
+- 身体成分数据
+- 卡路里消耗数据
+
+#### 部署架构
+
+**Vercel部署方案**
+项目采用混合部署架构，可以完全在Vercel上部署：
+
+1. **前端部署**：Next.js应用部署在Vercel
+2. **Python后端**：通过Vercel的Python运行时支持
+3. **API路由**：Next.js API路由调用Python脚本
+4. **数据流**：前端 → Next.js API → Python脚本 → Garmin Connect
+
+**部署文件结构**
+```
+├── zhiji-app/          # Next.js前端应用
+├── backend/            # Python后端服务
+│   ├── garmin_service.py    # Garmin数据服务
+│   ├── garmin_script.py     # 独立Python脚本
+│   └── requirements.txt     # Python依赖
+└── vercel.json         # Vercel部署配置
+```
+
+**关键配置**
+- `vercel.json`：配置Python运行时和路由
+- API路由：`/api/garmin-python/route.ts`调用Python脚本
+- Python脚本：独立运行，返回JSON数据
+
+#### 开发和部署步骤
+1. ✅ 设置Python后端环境
+2. ✅ 创建Python Garmin服务
+3. ✅ 配置Vercel部署文件
+4. 🔄 更新前端API调用
+5. 🔄 测试数据获取功能
+6. 🔄 部署到生产环境
 
 ### 安全性
 - 账号信息仅用于数据同步，不会被存储或传输给第三方

@@ -83,10 +83,40 @@ export default function GarminPage() {
   const [dailyData, setDailyData] = useState<DayData[]>([]);
 
   useEffect(() => {
-    console.log('[DEBUG] GarminPage: 组件已挂载');
-    loadExistingData(); // 只加载已有数据，不自动同步
+    const loadExistingData = async () => {
+      try {
+        setIsLoading(true);
+        console.log('[DEBUG] GarminPage: 开始加载已有数据');
+        
+        // 获取过去7天的已有数据（不强制同步）
+        const response = await fetch('/api/garmin/sync?days=7&force=false');
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length > 0) {
+          setGarminDataList(result.data);
+          setIsConfigured(true);
+          setLastSyncTime(result.last_sync);
+          
+          // 重新组织数据为按日期的格式
+          const organizedData = organizeDataByDate(result.data);
+          setDailyData(organizedData);
+          
+          console.log('[DEBUG] GarminPage: 已有数据加载成功:', result.data);
+        } else {
+          console.log('[DEBUG] GarminPage: 暂无已有数据');
+          setIsConfigured(false);
+        }
+      } catch (error) {
+        console.error('[ERROR] GarminPage: 数据加载失败:', error);
+        setIsConfigured(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadExistingData();
     
-    // 启动自动同步调度器
+    // 设置每日自动同步调度器
     scheduler.setupDailySync();
     
     // 组件卸载时清理定时器
@@ -94,37 +124,6 @@ export default function GarminPage() {
       scheduler.clearAllTimers();
     };
   }, []);
-
-  const loadExistingData = async () => {
-    try {
-      setIsLoading(true);
-      console.log('[DEBUG] GarminPage: 开始加载已有数据');
-      
-      // 获取过去7天的已有数据（不强制同步）
-      const response = await fetch('/api/garmin/sync?days=7&force=false');
-      const result = await response.json();
-      
-      if (result.success && result.data && result.data.length > 0) {
-        setGarminDataList(result.data);
-        setIsConfigured(true);
-        setLastSyncTime(result.last_sync);
-        
-        // 重新组织数据为按日期的格式
-        const organizedData = organizeDataByDate(result.data);
-        setDailyData(organizedData);
-        
-        console.log('[DEBUG] GarminPage: 已有数据加载成功:', result.data);
-      } else {
-        console.log('[DEBUG] GarminPage: 暂无已有数据');
-        setIsConfigured(false);
-      }
-    } catch (error) {
-      console.error('[ERROR] GarminPage: 数据加载失败:', error);
-      setIsConfigured(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loadGarminData = async () => {
     try {

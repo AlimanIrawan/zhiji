@@ -286,12 +286,7 @@ export interface GarminData {
     remSleep: number; // REM睡眠（分钟）
     awakeTime: number; // 清醒时间（分钟）
     sleepScore: number; // 睡眠评分
-  };
-  
-  // 身体指标
-  bodyMetrics: {
-    fitnessAge: number; // 体能年龄
-    hrv: {
+    hrv?: {
       lastNightAvg: number; // 昨夜平均HRV
       status: string;
     };
